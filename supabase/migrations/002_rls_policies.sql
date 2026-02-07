@@ -133,3 +133,17 @@ CREATE POLICY "members can select own automation rules"
       AND hm.is_active = TRUE
     )
   );
+
+-- -------------------------------------------------------------------------
+-- Helper function: set telegram_id context for RLS
+-- Frontend calls this before any RLS-gated queries
+-- -------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION set_telegram_context(telegram_id BIGINT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  PERFORM set_config('app.telegram_id', telegram_id::TEXT, false);
+END;
+$$;

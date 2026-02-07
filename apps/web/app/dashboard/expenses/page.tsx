@@ -16,11 +16,10 @@ import {
   Expense,
   Member,
 } from "@/lib/queries";
-
-// Hardcoded por ahora — se reemplaza con el hogar de la sesión cuando hay auth
-const HOUSEHOLD_ID = 1;
+import { useActiveHousehold } from "@/lib/useAuth";
 
 export default function ExpensesPage() {
+  const { householdId, loading: authLoading } = useActiveHousehold();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,16 +27,18 @@ export default function ExpensesPage() {
   const [category, setCategory] = useState("Todas");
 
   useEffect(() => {
-    const now = new Date();
-    Promise.all([
-      getExpenses(HOUSEHOLD_ID, now.getFullYear(), now.getMonth() + 1),
-      getHouseholdMembers(HOUSEHOLD_ID),
-    ]).then(([exp, mem]) => {
-      setExpenses(exp);
-      setMembers(mem);
-      setLoading(false);
-    });
-  }, []);
+    if (!authLoading && householdId) {
+      const now = new Date();
+      Promise.all([
+        getExpenses(householdId, now.getFullYear(), now.getMonth() + 1),
+        getHouseholdMembers(householdId),
+      ]).then(([exp, mem]) => {
+        setExpenses(exp);
+        setMembers(mem);
+        setLoading(false);
+      });
+    }
+  }, [authLoading, householdId]);
 
   const memberMap = useMemo(() => buildMemberMap(members), [members]);
 
@@ -55,7 +56,7 @@ export default function ExpensesPage() {
 
   const total = filtered.reduce((s, e) => s + e.amount, 0);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold text-gray-900">Gastos</h1>

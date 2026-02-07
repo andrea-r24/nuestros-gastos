@@ -13,22 +13,23 @@ import {
   Expense,
   Member,
 } from "@/lib/queries";
-
-// Hardcoded por ahora — se reemplaza con el hogar de la sesión cuando hay auth
-const HOUSEHOLD_ID = 1;
+import { useActiveHousehold } from "@/lib/useAuth";
 
 export default function DashboardPage() {
+  const { householdId, user, loading: authLoading } = useActiveHousehold();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [budget, setBudget] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
+    if (!householdId) return;
+
     const now = new Date();
     const [exp, mem, hh] = await Promise.all([
-      getExpenses(HOUSEHOLD_ID, now.getFullYear(), now.getMonth() + 1),
-      getHouseholdMembers(HOUSEHOLD_ID),
-      getHousehold(HOUSEHOLD_ID),
+      getExpenses(householdId, now.getFullYear(), now.getMonth() + 1),
+      getHouseholdMembers(householdId),
+      getHousehold(householdId),
     ]);
     setExpenses(exp);
     setMembers(mem);
@@ -37,10 +38,12 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!authLoading && householdId) {
+      fetchData();
+    }
+  }, [authLoading, householdId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col gap-4">
         <p className="text-center text-gray-400 text-sm py-8">Cargando…</p>
@@ -54,7 +57,12 @@ export default function DashboardPage() {
       <DebtCard expenses={expenses} members={members} />
       <CategoryBreakdown expenses={expenses} />
       <RecentExpenses expenses={expenses} />
-      <FAB members={members} onRefresh={fetchData} />
+      <FAB
+        members={members}
+        onRefresh={fetchData}
+        currentUserId={user?.id ?? 0}
+        householdId={householdId ?? 0}
+      />
     </div>
   );
 }

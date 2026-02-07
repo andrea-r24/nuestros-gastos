@@ -2,6 +2,24 @@ import { getSupabaseClient } from "./supabase";
 import { categoryType } from "./utils";
 
 // ---------------------------------------------------------------------------
+// RLS Context Helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensures RLS context is set before executing queries.
+ * Call this before any RLS-protected query to set app.telegram_id.
+ */
+async function ensureRLSContext() {
+  const telegramId = localStorage.getItem("telegram_id");
+  if (!telegramId) {
+    throw new Error("Not authenticated");
+  }
+
+  const client = getSupabaseClient();
+  await client.rpc("set_telegram_context", { telegram_id: parseInt(telegramId, 10) });
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 export interface Household {
@@ -44,6 +62,8 @@ export function buildMemberMap(members: Member[]): Map<number, string> {
 
 /** Hogar: nombre + presupuesto */
 export async function getHousehold(id: number): Promise<Household | null> {
+  await ensureRLSContext();
+
   const { data } = await getSupabaseClient()
     .from("households")
     .select("*")
@@ -61,6 +81,8 @@ export async function getHousehold(id: number): Promise<Household | null> {
 export async function getHouseholdMembers(
   householdId: number
 ): Promise<Member[]> {
+  await ensureRLSContext();
+
   const { data } = await getSupabaseClient()
     .from("household_members")
     .select("user_id, role, users!user_id(name)")
@@ -80,6 +102,8 @@ export async function getExpenses(
   year: number,
   month: number
 ): Promise<Expense[]> {
+  await ensureRLSContext();
+
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
@@ -123,6 +147,8 @@ export async function insertExpense({
   description: string;
   sharedWith: number[];
 }) {
+  await ensureRLSContext();
+
   const { error } = await getSupabaseClient()
     .from("expenses")
     .insert({
@@ -139,6 +165,8 @@ export async function insertExpense({
 
 /** Actualiza el presupuesto mensual del hogar */
 export async function updateBudget(householdId: number, budget: number | null) {
+  await ensureRLSContext();
+
   const { error } = await getSupabaseClient()
     .from("households")
     .update({ monthly_budget: budget })

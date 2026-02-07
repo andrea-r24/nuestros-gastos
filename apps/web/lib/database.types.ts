@@ -256,6 +256,11 @@ export interface Database {
 
     Views: {};
 
-    Functions: {};
+    Functions: {
+      set_telegram_context: {
+        Args: { telegram_id: number };
+        Returns: undefined;
+      };
+    };
   };
 }

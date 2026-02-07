@@ -5,23 +5,21 @@ import { Plus, X } from "lucide-react";
 import { VALID_CATEGORIES } from "@/lib/utils";
 import { Member, insertExpense } from "@/lib/queries";
 
-// Hardcoded por ahora — se reemplaza con el hogar / usuario de la sesión cuando hay auth
-const HOUSEHOLD_ID = 1;
-const CURRENT_USER_ID = 1;
-
 interface Props {
   members: Member[];
   onRefresh: () => void;
+  currentUserId: number;
+  householdId: number;
 }
 
-export default function FAB({ members, onRefresh }: Props) {
+export default function FAB({ members, onRefresh, currentUserId, householdId }: Props) {
   const [open, setOpen] = useState(false);
 
   // Form state
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(VALID_CATEGORIES[0]);
   const [description, setDescription] = useState("");
-  const [sharedWith, setSharedWith] = useState<number[]>([CURRENT_USER_ID]);
+  const [sharedWith, setSharedWith] = useState<number[]>([currentUserId]);
 
   // Submit state
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +35,7 @@ export default function FAB({ members, onRefresh }: Props) {
     setAmount("");
     setCategory(VALID_CATEGORIES[0]);
     setDescription("");
-    setSharedWith([CURRENT_USER_ID]);
+    setSharedWith([currentUserId]);
     setError(null);
   };
 
@@ -56,8 +54,8 @@ export default function FAB({ members, onRefresh }: Props) {
     setError(null);
     try {
       await insertExpense({
-        householdId: HOUSEHOLD_ID,
-        paidBy: CURRENT_USER_ID,
+        householdId,
+        paidBy: currentUserId,
         amount: numAmount,
         category,
         description,

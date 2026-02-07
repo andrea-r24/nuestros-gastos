@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { getHousehold, getHouseholdMembers, updateBudget, Household, Member } from "@/lib/queries";
-
-const HOUSEHOLD_ID = 1;
+import { useActiveHousehold } from "@/lib/useAuth";
 
 export default function SettingsPage() {
+  const { householdId, loading: authLoading } = useActiveHousehold();
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,11 +14,12 @@ export default function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
 
   const handleSave = async () => {
+    if (!householdId) return;
     const num = budget === "" ? null : Number(budget);
     if (budget !== "" && isNaN(num!)) return;
     setSaving(true);
     try {
-      await updateBudget(HOUSEHOLD_ID, num);
+      await updateBudget(householdId, num);
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
@@ -29,20 +30,22 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    Promise.all([
-      getHousehold(HOUSEHOLD_ID),
-      getHouseholdMembers(HOUSEHOLD_ID),
-    ]).then(([hh, mem]) => {
-      setHousehold(hh);
-      setMembers(mem);
-      if (hh?.monthly_budget != null) {
-        setBudget(String(hh.monthly_budget));
-      }
-      setLoading(false);
-    });
-  }, []);
+    if (!authLoading && householdId) {
+      Promise.all([
+        getHousehold(householdId),
+        getHouseholdMembers(householdId),
+      ]).then(([hh, mem]) => {
+        setHousehold(hh);
+        setMembers(mem);
+        if (hh?.monthly_budget != null) {
+          setBudget(String(hh.monthly_budget));
+        }
+        setLoading(false);
+      });
+    }
+  }, [authLoading, householdId]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold text-gray-900">Configuración</h1>

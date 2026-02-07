@@ -13,11 +13,10 @@ import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { categoryHex, formatCurrency, formatMonthYear } from "@/lib/utils";
 import { getExpenses, Expense } from "@/lib/queries";
-
-// Hardcoded por ahora — se reemplaza con el hogar de la sesión cuando hay auth
-const HOUSEHOLD_ID = 1;
+import { useActiveHousehold } from "@/lib/useAuth";
 
 export default function AnalyticsPage() {
+  const { householdId, loading: authLoading } = useActiveHousehold();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -25,12 +24,14 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setExpenses([]);
-    getExpenses(HOUSEHOLD_ID, year, month).then((exp) => {
-      setExpenses(exp);
-      setLoading(false);
-    });
-  }, [year, month]);
+    if (!authLoading && householdId) {
+      setExpenses([]);
+      getExpenses(householdId, year, month).then((exp) => {
+        setExpenses(exp);
+        setLoading(false);
+      });
+    }
+  }, [authLoading, householdId, year, month]);
 
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear((y) => y - 1); }
@@ -50,7 +51,7 @@ export default function AnalyticsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [expenses]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold text-gray-900">Analytics</h1>

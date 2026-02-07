@@ -57,7 +57,7 @@ export default function Home() {
     };
 
     const script = document.createElement("script");
-    script.src = "https://core.telegram.org/js/telegram-widget.js?4";
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.setAttribute("data-telegram-login", BOT_USERNAME);
     script.setAttribute("data-size", "large");
     script.setAttribute("data-onauth", "onTelegramAuth");

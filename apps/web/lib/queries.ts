@@ -173,3 +173,43 @@ export async function updateBudget(householdId: number, budget: number | null) {
     .eq("id", householdId);
   if (error) throw error;
 }
+
+/** Busca un usuario por su Telegram ID */
+export async function getUserByTelegramId(
+  telegramId: number
+): Promise<{ id: number; name: string } | null> {
+  const { data } = await getSupabaseClient()
+    .from("users")
+    .select("id, name")
+    .eq("telegram_id", telegramId)
+    .single();
+  return data;
+}
+
+/** Agrega un miembro a un household */
+export async function addMemberToHousehold(householdId: number, userId: number) {
+  await ensureRLSContext();
+
+  // Check if already a member
+  const { data: existing } = await getSupabaseClient()
+    .from("household_members")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("user_id", userId)
+    .single();
+
+  if (existing) {
+    throw new Error("El usuario ya es miembro de este hogar");
+  }
+
+  // Add as member
+  const { error } = await getSupabaseClient()
+    .from("household_members")
+    .insert({
+      household_id: householdId,
+      user_id: userId,
+      role: "member",
+    });
+
+  if (error) throw error;
+}

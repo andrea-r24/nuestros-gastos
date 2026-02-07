@@ -18,19 +18,40 @@ export default function Home() {
     // Callback global que el widget de Telegram invoca tras autenticación exitosa.
     (window as any).onTelegramAuth = async (user: any) => {
       try {
-        const res = await fetch("/api/verify-telegram-auth", {
+        // 1. Verify Telegram auth hash
+        const verifyRes = await fetch("/api/verify-telegram-auth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(user),
         });
-        const data = await res.json();
-        if (data.valid) {
-          localStorage.setItem("telegram_id", String(data.telegram_id));
+        const verifyData = await verifyRes.json();
+
+        if (!verifyData.valid) {
+          alert("Error de autenticación: " + (verifyData.error || "hash inválido"));
+          return;
+        }
+
+        // 2. Auto-register or get existing user
+        const registerRes = await fetch("/api/register-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            telegram_id: user.id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            username: user.username,
+          }),
+        });
+        const registerData = await registerRes.json();
+
+        if (registerData.user) {
+          localStorage.setItem("telegram_id", String(registerData.user.telegram_id));
           router.push("/dashboard");
         } else {
-          alert("Error de autenticación: " + (data.error || "hash inválido"));
+          alert("Error al registrar usuario");
         }
-      } catch {
+      } catch (error) {
+        console.error("Auth error:", error);
         alert("Error al verificar la autenticación");
       }
     };

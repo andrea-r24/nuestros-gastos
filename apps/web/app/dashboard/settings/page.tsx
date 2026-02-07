@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getHousehold, getHouseholdMembers, updateBudget, Household, Member } from "@/lib/queries";
+import {
+  getHousehold,
+  getHouseholdMembers,
+  updateBudget,
+  getUserByTelegramId,
+  addMemberToHousehold,
+  Household,
+  Member,
+} from "@/lib/queries";
 import { useActiveHousehold } from "@/lib/useAuth";
 
 export default function SettingsPage() {
@@ -12,6 +20,11 @@ export default function SettingsPage() {
   const [budget, setBudget] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
+
+  // Add member state
+  const [telegramIdInput, setTelegramIdInput] = useState("");
+  const [addingMember, setAddingMember] = useState(false);
+  const [addMemberStatus, setAddMemberStatus] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!householdId) return;
@@ -26,6 +39,46 @@ export default function SettingsPage() {
       // error silenciado por ahora
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!householdId || !telegramIdInput) return;
+
+    const telegramId = parseInt(telegramIdInput, 10);
+    if (isNaN(telegramId)) {
+      setAddMemberStatus("❌ Telegram ID inválido");
+      setTimeout(() => setAddMemberStatus(null), 3000);
+      return;
+    }
+
+    setAddingMember(true);
+    setAddMemberStatus(null);
+
+    try {
+      // 1. Check if user exists
+      const user = await getUserByTelegramId(telegramId);
+      if (!user) {
+        setAddMemberStatus("❌ Usuario no encontrado. Debe hacer login primero.");
+        setTimeout(() => setAddMemberStatus(null), 4000);
+        return;
+      }
+
+      // 2. Add to household
+      await addMemberToHousehold(householdId, user.id);
+
+      // 3. Refresh members list
+      const updatedMembers = await getHouseholdMembers(householdId);
+      setMembers(updatedMembers);
+
+      setAddMemberStatus(`✅ ${user.name} agregado correctamente`);
+      setTelegramIdInput("");
+      setTimeout(() => setAddMemberStatus(null), 3000);
+    } catch (error: any) {
+      setAddMemberStatus("❌ " + (error.message || "Error al agregar miembro"));
+      setTimeout(() => setAddMemberStatus(null), 4000);
+    } finally {
+      setAddingMember(false);
     }
   };
 
@@ -114,6 +167,35 @@ export default function SettingsPage() {
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* Add member card */}
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
+          Agregar miembro
+        </h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Ingresa el Telegram ID del usuario que quieres agregar. El usuario debe haber hecho login al menos una vez.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Telegram ID (ej: 123456789)"
+            value={telegramIdInput}
+            onChange={(e) => setTelegramIdInput(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6C63FF]"
+          />
+          <button
+            onClick={handleAddMember}
+            disabled={addingMember || !telegramIdInput}
+            className="bg-[#6C63FF] text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50 hover:bg-[#5A52D5] transition-colors whitespace-nowrap"
+          >
+            {addingMember ? "Agregando…" : "Agregar"}
+          </button>
+        </div>
+        {addMemberStatus && (
+          <p className="text-xs mt-2">{addMemberStatus}</p>
+        )}
       </div>
 
       {/* Danger zone placeholder */}

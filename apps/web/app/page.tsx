@@ -140,9 +140,26 @@ export default function Home() {
           </div>
 
           {/* CTA */}
-          <div className="flex flex-col items-start gap-3">
+          <div className="flex flex-col items-start gap-4">
+            {/* Primary: bot magic link */}
             {BOT_USERNAME ? (
-              <div ref={widgetRef} className="flex" />
+              <div className="flex flex-col gap-3 w-full">
+                <a
+                  href={`https://t.me/${BOT_USERNAME}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-[#22C55E] text-white px-8 py-4 rounded-2xl text-base font-bold shadow-lg shadow-green-200 hover:bg-[#1DA850] transition-all hover:-translate-y-0.5 active:scale-95"
+                >
+                  Abrir @{BOT_USERNAME} en Telegram
+                </a>
+                <p className="text-sm text-slate-500">
+                  En el bot, escribe{" "}
+                  <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">/login</code>
+                  {" "}para recibir tu link de acceso.
+                </p>
+                {/* Secondary: keep the widget hidden but functional as fallback */}
+                <div ref={widgetRef} className="hidden" />
+              </div>
             ) : (
               <Link
                 href="/dashboard"
@@ -152,7 +169,7 @@ export default function Home() {
               </Link>
             )}
             <p className="text-xs text-slate-400">
-              Sin contraseñas. Inicia sesión con tu cuenta de Telegram.
+              Sin contraseñas. Accede con tu cuenta de Telegram.
             </p>
           </div>
         </div>

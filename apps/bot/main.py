@@ -43,6 +43,7 @@ from handlers.gasto   import gasto_handler, gasto_shared_step, cancel_handler, A
 from handlers.balance import balance_handler                         # noqa: E402
 from handlers.espacio import espacio_handler, espacio_callback       # noqa: E402
 from handlers.resumen import resumen_handler                         # noqa: E402
+from handlers.login   import login_handler                           # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +62,7 @@ def build_app():
 
     # --- Simple command handlers ---
     app.add_handler(CommandHandler("start",   start_handler))
+    app.add_handler(CommandHandler("login",   login_handler))
     app.add_handler(CommandHandler("balance", balance_handler))
     app.add_handler(CommandHandler("espacio", espacio_handler))
     app.add_handler(CommandHandler("resumen", resumen_handler))

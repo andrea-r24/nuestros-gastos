@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 WELCOME_TEXT = """Hola {name}, bienvenido/a a NuestrosGastos!
 
 Comandos disponibles:
+  /login    — Entrar al dashboard web
   /gasto    — Registrar un nuevo gasto
   /balance  — Ver quién debe a quién este mes
   /resumen  — Resumen mensual por categoría

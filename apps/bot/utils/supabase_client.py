@@ -115,6 +115,15 @@ def set_active_household(user_id: int, household_id: int) -> None:
     logger.info(f"User {user_id} switched active household to {household_id}")
 
 
+def create_auth_token(telegram_id: int, name: str) -> str:
+    """Insert a one-time magic-link token for this user. Returns the UUID string."""
+    resp = get_client().table("auth_tokens").insert({
+        "telegram_id": telegram_id,
+        "name": name,
+    }).execute()
+    return resp.data[0]["token"]
+
+
 def get_household_members(household_id: int) -> List[Dict]:
     """Return all active users who are members of the given household."""
     members = (

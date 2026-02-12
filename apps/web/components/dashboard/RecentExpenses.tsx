@@ -1,63 +1,79 @@
 "use client";
 
-import { formatCurrency, categoryHex, categoryType, formatShortDate } from "@/lib/utils";
+import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 import { Expense } from "@/lib/queries";
+import { getCategoryInfo } from "@/lib/categories";
 
 interface Props {
   expenses: Expense[];
 }
 
+function ExpenseRow({ exp }: { exp: Expense }) {
+  const info = getCategoryInfo(exp.category);
+  const Icon = info.subIcon;
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: info.macroColor + "20" }}
+      >
+        <Icon size={18} style={{ color: info.macroColor }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-900 truncate">
+          {exp.description || info.subName}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          Añadido por {exp.payer_name}
+        </p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="text-sm font-display font-bold text-gray-900">{formatCurrency(exp.amount)}</p>
+        <p className="text-xs text-gray-400">{info.subName}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function RecentExpenses({ expenses }: Props) {
-  const recent = expenses.slice(0, 5);
+  if (expenses.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-gray-900">Gastos recientes</h2>
+        </div>
+        <div className="bg-white rounded-[24px] shadow-sm p-5">
+          <p className="text-sm text-gray-400 text-center py-4">Sin gastos registrados</p>
+        </div>
+      </div>
+    );
+  }
+
+  const recent = expenses.slice(0, 3);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
-      <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
-        Últimos gastos
-      </h2>
+    <div>
+      {/* Section title OUTSIDE the card */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-gray-900">Gastos recientes</h2>
+        {expenses.length > 3 && (
+          <Link
+            href="/dashboard/expenses"
+            className="text-xs font-bold text-emerald-500 hover:text-emerald-600 uppercase tracking-wide transition-colors"
+          >
+            VER MÁS
+          </Link>
+        )}
+      </div>
 
-      <ul className="space-y-3">
-        {recent.map((exp) => {
-          const type = categoryType(exp.category);
-          return (
-            <li key={exp.id} className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                {/* Category icon circle */}
-                <span
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-full text-white text-xs font-bold flex-shrink-0 mt-0.5"
-                  style={{ backgroundColor: categoryHex(exp.category) }}
-                >
-                  {exp.category[0]}
-                </span>
-
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-gray-900">
-                      {exp.description}
-                    </p>
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded-full ${
-                        type === "fixed"
-                          ? "bg-gray-100 text-gray-500"
-                          : "bg-[#6C63FF]/10 text-[#6C63FF]"
-                      }`}
-                    >
-                      {type}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {formatShortDate(exp.expense_date)} · {exp.payer_name} pagó
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                {formatCurrency(exp.amount)}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="bg-white rounded-[24px] shadow-sm p-5">
+        <div className="divide-y divide-gray-100">
+          {recent.map((exp) => (
+            <ExpenseRow key={exp.id} exp={exp} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

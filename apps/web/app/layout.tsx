@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "@/styles/globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "NuestrosGastos",
@@ -16,9 +13,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} bg-gray-50 min-h-screen`}>
-        {/* Mobile-first: max-w-md centered. pb-20 reserves space for the fixed BottomNav. */}
-        <div className="max-w-md mx-auto min-h-screen pb-20">{children}</div>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-[#F4F5F8] min-h-screen">
+        {children}
       </body>
     </html>
   );

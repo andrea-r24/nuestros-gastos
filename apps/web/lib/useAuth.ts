@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "./supabase";
+import { isMockMode, MOCK_USER } from "./mock-data";
 
 export interface AuthUser {
   id: number;
@@ -15,6 +16,9 @@ export interface AuthUser {
  * Hook to ensure user is authenticated.
  * Redirects to "/" if no telegram_id in localStorage.
  * Returns user data once loaded.
+ *
+ * In demo mode (localStorage.dev_mock = "1"), returns MOCK_USER immediately
+ * without hitting Supabase.
  */
 export function useAuth() {
   const router = useRouter();
@@ -22,6 +26,13 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Demo mode: return mock user immediately
+    if (isMockMode()) {
+      setUser(MOCK_USER);
+      setLoading(false);
+      return;
+    }
+
     const telegramId = localStorage.getItem("telegram_id");
 
     if (!telegramId) {
@@ -70,8 +81,8 @@ export function useActiveHousehold() {
     if (!user) return;
 
     if (!user.active_household_id) {
-      // No active household — redirect to settings to choose one
-      router.push("/dashboard/settings");
+      // No active household — redirect to onboarding to create one
+      router.push("/onboarding");
     }
   }, [user, loading, router]);
 

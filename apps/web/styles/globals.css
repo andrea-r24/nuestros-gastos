@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --primary: #22C55E;
+  --accent: #EC4899;
+  --bg-soft: #F4F5F8;
+}
+
+body {
+  font-family: 'Noto Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

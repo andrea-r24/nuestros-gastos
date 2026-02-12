@@ -1,211 +1,153 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  getHousehold,
-  getHouseholdMembers,
-  updateBudget,
-  getUserByTelegramId,
-  addMemberToHousehold,
-  Household,
-  Member,
-} from "@/lib/queries";
-import { useActiveHousehold } from "@/lib/useAuth";
+import { useRouter } from "next/navigation";
+import { LogOut, MessageCircle, Mail, Bell, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
 
 export default function SettingsPage() {
-  const { householdId, loading: authLoading } = useActiveHousehold();
-  const [household, setHousehold] = useState<Household | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [budget, setBudget] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
+  const { user } = useAuth();
+  const router = useRouter();
 
-  // Add member state
-  const [telegramIdInput, setTelegramIdInput] = useState("");
-  const [addingMember, setAddingMember] = useState(false);
-  const [addMemberStatus, setAddMemberStatus] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    if (!householdId) return;
-    const num = budget === "" ? null : Number(budget);
-    if (budget !== "" && isNaN(num!)) return;
-    setSaving(true);
-    try {
-      await updateBudget(householdId, num);
-      setSaveStatus("saved");
-      setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch {
-      // error silenciado por ahora
-    } finally {
-      setSaving(false);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("telegram_id");
+    localStorage.removeItem("dev_mock");
+    router.push("/");
   };
 
-  const handleAddMember = async () => {
-    if (!householdId || !telegramIdInput) return;
-
-    const telegramId = parseInt(telegramIdInput, 10);
-    if (isNaN(telegramId)) {
-      setAddMemberStatus("❌ Telegram ID inválido");
-      setTimeout(() => setAddMemberStatus(null), 3000);
-      return;
-    }
-
-    setAddingMember(true);
-    setAddMemberStatus(null);
-
-    try {
-      // 1. Check if user exists
-      const user = await getUserByTelegramId(telegramId);
-      if (!user) {
-        setAddMemberStatus("❌ Usuario no encontrado. Debe hacer login primero.");
-        setTimeout(() => setAddMemberStatus(null), 4000);
-        return;
-      }
-
-      // 2. Add to household
-      await addMemberToHousehold(householdId, user.id);
-
-      // 3. Refresh members list
-      const updatedMembers = await getHouseholdMembers(householdId);
-      setMembers(updatedMembers);
-
-      setAddMemberStatus(`✅ ${user.name} agregado correctamente`);
-      setTelegramIdInput("");
-      setTimeout(() => setAddMemberStatus(null), 3000);
-    } catch (error: any) {
-      setAddMemberStatus("❌ " + (error.message || "Error al agregar miembro"));
-      setTimeout(() => setAddMemberStatus(null), 4000);
-    } finally {
-      setAddingMember(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!authLoading && householdId) {
-      Promise.all([
-        getHousehold(householdId),
-        getHouseholdMembers(householdId),
-      ]).then(([hh, mem]) => {
-        setHousehold(hh);
-        setMembers(mem);
-        if (hh?.monthly_budget != null) {
-          setBudget(String(hh.monthly_budget));
-        }
-        setLoading(false);
-      });
-    }
-  }, [authLoading, householdId]);
-
-  if (authLoading || loading) {
-    return (
-      <div className="flex flex-col gap-4">
-        <h1 className="text-xl font-bold text-gray-900">Configuración</h1>
-        <p className="text-center text-gray-400 text-sm py-8">Cargando…</p>
-      </div>
-    );
-  }
+  const name = user?.name ?? "...";
+  const firstName = name.split(" ")[0];
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold text-gray-900">Configuración</h1>
+      <h1 className="text-xl font-bold text-gray-900">Ajustes</h1>
 
-      {/* Household info card */}
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
-          Hogar
+      {/* Account card */}
+      <div className="bg-white rounded-[24px] shadow-sm p-5">
+        <h2 className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-4">
+          Mi cuenta
         </h2>
-        <p className="text-base font-semibold text-gray-900">
-          {household?.name}
-        </p>
-
-        {/* Budget input */}
-        <div className="mt-4">
-          <label className="text-xs text-gray-400 block mb-1">
-            Presupuesto mensual (S/)
-          </label>
-          <input
-            type="number"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6C63FF]"
-          />
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="mt-2 w-full bg-[#6C63FF] text-white text-sm font-semibold rounded-lg py-2 disabled:opacity-50 hover:bg-[#5A52D5] transition-colors"
-          >
-            {saving ? "Guardando…" : saveStatus === "saved" ? "Guardado" : "Guardar"}
-          </button>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-[#22C55E] flex items-center justify-center text-white text-xl font-black">
+            {firstName[0]}
+          </div>
+          <div>
+            <p className="text-base font-bold text-gray-900">{name}</p>
+            {user?.telegram_id && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                Telegram ID:{" "}
+                <span className="font-mono text-gray-600">{user.telegram_id}</span>
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-0.5">
+              Comparte tu ID para que te puedan agregar a un espacio
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Members card */}
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
-          Miembros
+      {/* Connections card */}
+      <div className="bg-white rounded-[24px] shadow-sm p-5">
+        <h2 className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-4">
+          Conexiones
         </h2>
         <ul className="space-y-3">
-          {members.map((m) => (
-            <li key={m.user_id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#6C63FF]/10 flex items-center justify-center text-[#6C63FF] text-sm font-bold">
-                  {m.name[0]}
-                </div>
-                <span className="text-sm text-gray-900">{m.name}</span>
+          {/* Telegram */}
+          <li className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#0088cc]/10 flex items-center justify-center">
+                <MessageCircle size={18} className="text-[#0088cc]" />
               </div>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${
-                  m.role === "owner"
-                    ? "bg-[#6C63FF]/10 text-[#6C63FF]"
-                    : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {m.role}
-              </span>
-            </li>
-          ))}
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Telegram</p>
+                <p className="text-xs text-gray-400">Para registrar gastos por chat</p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-[#22C55E] bg-[#22C55E]/10 px-2.5 py-1 rounded-full">
+              Conectado
+            </span>
+          </li>
+
+          {/* Gmail */}
+          <li className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#EA4335]/10 flex items-center justify-center">
+                <Mail size={18} className="text-[#EA4335]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Gmail</p>
+                <p className="text-xs text-gray-400">
+                  Importar gastos de notificaciones bancarias
+                </p>
+              </div>
+            </div>
+            <button
+              disabled
+              className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full cursor-not-allowed"
+            >
+              Proximamente
+            </button>
+          </li>
         </ul>
       </div>
 
-      {/* Add member card */}
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
-          Agregar miembro
+      {/* Notifications card */}
+      <div className="bg-white rounded-[24px] shadow-sm p-5">
+        <h2 className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-4">
+          Notificaciones
         </h2>
-        <p className="text-xs text-gray-500 mb-3">
-          Ingresa el Telegram ID del usuario que quieres agregar. El usuario debe haber hecho login al menos una vez.
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Telegram ID (ej: 123456789)"
-            value={telegramIdInput}
-            onChange={(e) => setTelegramIdInput(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6C63FF]"
-          />
-          <button
-            onClick={handleAddMember}
-            disabled={addingMember || !telegramIdInput}
-            className="bg-[#6C63FF] text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50 hover:bg-[#5A52D5] transition-colors whitespace-nowrap"
-          >
-            {addingMember ? "Agregando…" : "Agregar"}
-          </button>
-        </div>
-        {addMemberStatus && (
-          <p className="text-xs mt-2">{addMemberStatus}</p>
-        )}
+        <ul className="space-y-3">
+          <li className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center">
+                <Bell size={18} className="text-gray-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Resumen semanal</p>
+                <p className="text-xs text-gray-400">Recibe un resumen por Telegram</p>
+              </div>
+            </div>
+            <span className="text-xs text-gray-300 bg-gray-100 px-2.5 py-1 rounded-full">
+              Proximamente
+            </span>
+          </li>
+          <li className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center">
+                <Bell size={18} className="text-gray-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Alertas de presupuesto</p>
+                <p className="text-xs text-gray-400">Cuando alcances el 80% del limite</p>
+              </div>
+            </div>
+            <span className="text-xs text-gray-300 bg-gray-100 px-2.5 py-1 rounded-full">
+              Proximamente
+            </span>
+          </li>
+        </ul>
       </div>
 
-      {/* Danger zone placeholder */}
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
+      {/* Danger zone */}
+      <div className="bg-white rounded-[24px] shadow-sm p-5">
+        <h2 className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-4">
           Zona peligrosa
         </h2>
-        <p className="text-xs text-gray-400">
-          Opciones de eliminación y exportación próximamente…
-        </p>
+        <div className="space-y-3">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold rounded-xl py-3 text-sm transition-colors"
+          >
+            <LogOut size={16} />
+            Cerrar sesion
+          </button>
+          <button
+            disabled
+            className="w-full flex items-center justify-center gap-2 bg-[#EC4899]/5 text-[#EC4899]/40 font-semibold rounded-xl py-3 text-sm cursor-not-allowed"
+          >
+            <Trash2 size={16} />
+            Eliminar cuenta
+          </button>
+        </div>
       </div>
     </div>
   );

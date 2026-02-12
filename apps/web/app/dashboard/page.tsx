@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from "react";
 import BalanceCard from "@/components/dashboard/BalanceCard";
-import DebtCard from "@/components/dashboard/DebtCard";
 import CategoryBreakdown from "@/components/dashboard/CategoryBreakdown";
 import RecentExpenses from "@/components/dashboard/RecentExpenses";
-import FAB from "@/components/dashboard/FAB";
+import ContributionSection from "@/components/dashboard/ContributionSection";
 import {
   getExpenses,
   getHouseholdMembers,
@@ -15,6 +14,11 @@ import {
 } from "@/lib/queries";
 import { useActiveHousehold } from "@/lib/useAuth";
 
+const MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
 export default function DashboardPage() {
   const { householdId, user, loading: authLoading } = useActiveHousehold();
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -22,12 +26,15 @@ export default function DashboardPage() {
   const [budget, setBudget] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const now = new Date();
+  const currentMonthLabel = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+
   const fetchData = async () => {
     if (!householdId) return;
-
-    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
     const [exp, mem, hh] = await Promise.all([
-      getExpenses(householdId, now.getFullYear(), now.getMonth() + 1),
+      getExpenses(householdId, y, m),
       getHouseholdMembers(householdId),
       getHousehold(householdId),
     ]);
@@ -46,23 +53,17 @@ export default function DashboardPage() {
   if (authLoading || loading) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-center text-gray-400 text-sm py-8">Cargando…</p>
+        <p className="text-center text-gray-400 text-sm py-8">Cargando...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <BalanceCard expenses={expenses} members={members} budget={budget} />
-      <DebtCard expenses={expenses} members={members} />
+    <div className="flex flex-col gap-6">
+      <BalanceCard expenses={expenses} budget={budget} monthLabel={currentMonthLabel} />
       <CategoryBreakdown expenses={expenses} />
       <RecentExpenses expenses={expenses} />
-      <FAB
-        members={members}
-        onRefresh={fetchData}
-        currentUserId={user?.id ?? 0}
-        householdId={householdId ?? 0}
-      />
+      <ContributionSection expenses={expenses} members={members} />
     </div>
   );
 }

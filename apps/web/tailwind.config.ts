@@ -9,14 +9,16 @@ const config: Config = {
     extend: {
       colors: {
         // Brand
-        primary: "#6C63FF",
+        primary: "#22C55E",
+        accent: "#EC4899",
+        "bg-warm": "#F4F5F8",
         danger: "#FF6B6B",
         info: "#4ECDC4",
         warning: "#FFE66D",
 
         // Per-category palette (also mirrored in lib/utils.ts for Recharts)
         cat: {
-          supermercado: "#6C63FF",
+          supermercado: "#22C55E",
           delivery: "#F97316",
           servicios: "#FF6B6B",
           suscripciones: "#A855F7",
@@ -28,7 +30,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Noto Sans", "system-ui", "sans-serif"],
+        display: ["Montserrat", "system-ui", "sans-serif"],
       },
     },
   },

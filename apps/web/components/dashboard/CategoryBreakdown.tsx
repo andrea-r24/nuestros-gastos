@@ -1,74 +1,118 @@
 "use client";
 
-import DonutChart from "@/components/charts/DonutChart";
-import { formatCurrency, categoryHex, categoryType } from "@/lib/utils";
+import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 import { Expense } from "@/lib/queries";
+import { MacroCategory, getMacro, normalizeCategory } from "@/types/categories";
+import { categoryHierarchy, type MacroCategoryKey } from "@/lib/categories";
 
 interface Props {
   expenses: Expense[];
 }
 
-export default function CategoryBreakdown({ expenses }: Props) {
-  // Derivar totales por categoría desde los gastos
-  const categoryMap = new Map<string, number>();
+/** Aggregate expenses by macro category */
+function buildMacroGroups(expenses: Expense[]) {
+  const subMap = new Map<string, number>();
   for (const e of expenses) {
-    categoryMap.set(e.category, (categoryMap.get(e.category) ?? 0) + e.amount);
+    const key = normalizeCategory(e.category);
+    subMap.set(key, (subMap.get(key) ?? 0) + e.amount);
   }
-  const categories = Array.from(categoryMap.entries()).map(([name, amount]) => ({
-    name,
-    amount,
-  }));
 
-  const TOTAL = categories.reduce((s, c) => s + c.amount, 0);
+  const total = Array.from(subMap.values()).reduce((s, v) => s + v, 0);
 
-  const chartData = categories.map((c) => ({
-    name: c.name,
-    value: c.amount,
-    fill: categoryHex(c.name),
-  }));
+  const macroMap = new Map<string, { macro: MacroCategory; amount: number }>();
 
-  const sorted = [...categories].sort((a, b) => b.amount - a.amount);
+  for (const [subId, amount] of subMap) {
+    const macro = getMacro(subId);
+    if (!macroMap.has(macro.id)) {
+      macroMap.set(macro.id, { macro, amount: 0 });
+    }
+    macroMap.get(macro.id)!.amount += amount;
+  }
+
+  return { groups: Array.from(macroMap.values()).sort((a, b) => b.amount - a.amount), total };
+}
+
+export default function CategoryBreakdown({ expenses }: Props) {
+  if (expenses.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-gray-900">Categorías de gasto</h2>
+        </div>
+        <div className="bg-white rounded-[20px] shadow-sm p-5">
+          <p className="text-sm text-gray-400 text-center py-4">Sin gastos este mes</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { groups, total } = buildMacroGroups(expenses);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
-      <h2 className="text-xs text-gray-400 uppercase tracking-wide mb-3">
-        Por categoría
-      </h2>
+    <div>
+      {/* Section title OUTSIDE the card */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-gray-900">Categorías de gasto</h2>
+        <Link
+          href="/dashboard/categories"
+          className="text-xs font-bold text-emerald-500 hover:text-emerald-600 uppercase tracking-wide transition-colors"
+        >
+          VER MÁS
+        </Link>
+      </div>
 
-      <DonutChart data={chartData} />
-
-      <ul className="mt-4 space-y-2.5">
-        {sorted.map((c) => {
-          const pct = (c.amount / TOTAL) * 100;
-          const type = categoryType(c.name);
+      {/* Each category is a separate card */}
+      <div className="space-y-2.5">
+        {groups.map((g) => {
+          const libMacro = categoryHierarchy[g.macro.id as MacroCategoryKey];
+          const macroColor = libMacro?.color ?? g.macro.color;
+          const MacroIcon = libMacro?.icon;
+          const pct = total > 0 ? (g.amount / total) * 100 : 0;
           return (
-            <li key={c.name} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-block w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: categoryHex(c.name) }}
-                />
-                <span className="text-sm text-gray-700">{c.name}</span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    type === "fixed"
-                      ? "bg-gray-100 text-gray-500"
-                      : "bg-[#6C63FF]/10 text-[#6C63FF]"
-                  }`}
-                >
-                  {type}
-                </span>
+            <div
+              key={g.macro.id}
+              className="bg-white rounded-[20px] shadow-sm px-4 py-3.5 flex items-center gap-3"
+            >
+              {/* Icon */}
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: macroColor + "18" }}
+              >
+                {MacroIcon && (
+                  <MacroIcon size={18} style={{ color: macroColor }} />
+                )}
               </div>
-              <span className="text-sm font-semibold text-gray-900">
-                {formatCurrency(c.amount)}{" "}
-                <span className="text-gray-400 font-normal">
-                  ({pct.toFixed(0)}%)
+
+              {/* Name + pct */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {g.macro.label}
+                </p>
+                <p className="text-[10px] text-gray-400">
+                  {pct.toFixed(0)}% del total
+                </p>
+              </div>
+
+              {/* Amount + bar */}
+              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                <span className="text-sm font-display font-bold text-gray-900">
+                  {formatCurrency(g.amount)}
                 </span>
-              </span>
-            </li>
+                <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                  <div
+                    className="h-1.5 rounded-full"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: macroColor,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           );
         })}
-      </ul>
+      </div>
     </div>
   );
 }

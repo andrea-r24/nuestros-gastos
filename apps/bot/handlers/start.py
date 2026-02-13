@@ -10,7 +10,7 @@ Flow:
 
 import logging
 from telegram import Update
-from telegram.ext import ExtensionContext
+from telegram.ext import ContextTypes
 from utils.supabase_client import ensure_user_exists, get_user_households, set_active_household
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ Comandos disponibles:
 """
 
 
-async def start_handler(update: Update, context: ExtensionContext) -> None:
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Entry point: register user, set default household, send welcome."""
     user = update.effective_user
     telegram_id = user.id

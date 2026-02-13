@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Status = "loading" | "error";
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>("loading");
@@ -21,7 +21,6 @@ export default function AuthPage() {
 
     async function authenticate() {
       try {
-        // Step 1: Validate the magic-link token
         const authRes = await fetch("/api/bot-auth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -35,7 +34,6 @@ export default function AuthPage() {
           return;
         }
 
-        // Step 2: Register / fetch the user (same flow as Telegram widget)
         const registerRes = await fetch("/api/register-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -52,7 +50,6 @@ export default function AuthPage() {
           return;
         }
 
-        // Step 3: Persist session and redirect
         localStorage.setItem("telegram_id", String(registerData.user.telegram_id));
         router.push(registerData.isNewUser ? "/onboarding" : "/dashboard");
       } catch {
@@ -65,36 +62,47 @@ export default function AuthPage() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F8] flex items-center justify-center px-6">
-      <div className="bg-white rounded-[28px] shadow-lg p-8 max-w-sm w-full text-center">
-        {/* Logo */}
-        <div className="w-14 h-14 bg-gradient-to-br from-[#22C55E] to-[#EC4899] rounded-2xl flex items-center justify-center mx-auto mb-6 text-white font-black text-2xl">
-          N
-        </div>
-
-        {status === "loading" && (
-          <>
-            <h1 className="text-lg font-bold text-gray-900 mb-2">Verificando acceso…</h1>
-            <p className="text-sm text-gray-400">Un momento, estamos validando tu link.</p>
-            <div className="mt-6 flex justify-center">
-              <div className="w-6 h-6 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
-            </div>
-          </>
-        )}
-
-        {status === "error" && (
-          <>
-            <h1 className="text-lg font-bold text-gray-900 mb-2">Link inválido</h1>
-            <p className="text-sm text-gray-500 mb-6">{errorMsg}</p>
-            <a
-              href="/"
-              className="inline-block w-full bg-[#22C55E] text-white font-bold py-3 rounded-2xl text-sm"
-            >
-              Volver al inicio
-            </a>
-          </>
-        )}
+    <div className="bg-white rounded-[28px] shadow-lg p-8 max-w-sm w-full text-center">
+      <div className="w-14 h-14 bg-gradient-to-br from-[#22C55E] to-[#EC4899] rounded-2xl flex items-center justify-center mx-auto mb-6 text-white font-black text-2xl">
+        N
       </div>
+
+      {status === "loading" && (
+        <>
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Verificando acceso…</h1>
+          <p className="text-sm text-gray-400">Un momento, estamos validando tu link.</p>
+          <div className="mt-6 flex justify-center">
+            <div className="w-6 h-6 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
+          </div>
+        </>
+      )}
+
+      {status === "error" && (
+        <>
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Link inválido</h1>
+          <p className="text-sm text-gray-500 mb-6">{errorMsg}</p>
+          <a
+            href="/"
+            className="inline-block w-full bg-[#22C55E] text-white font-bold py-3 rounded-2xl text-sm"
+          >
+            Volver al inicio
+          </a>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <div className="min-h-screen bg-[#F4F5F8] flex items-center justify-center px-6">
+      <Suspense fallback={
+        <div className="bg-white rounded-[28px] shadow-lg p-8 max-w-sm w-full text-center">
+          <div className="w-6 h-6 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      }>
+        <AuthContent />
+      </Suspense>
     </div>
   );
 }

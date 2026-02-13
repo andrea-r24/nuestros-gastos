@@ -7,7 +7,7 @@ The currently active one is labelled [activo]. Tapping a button switches it.
 
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ExtensionContext
+from telegram.ext import ContextTypes
 from utils.supabase_client import (
     get_user_by_telegram_id,
     get_user_households,
@@ -17,7 +17,7 @@ from utils.supabase_client import (
 logger = logging.getLogger(__name__)
 
 
-async def espacio_handler(update: Update, context: ExtensionContext) -> None:
+async def espacio_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List user's households as an InlineKeyboard."""
     db_user = get_user_by_telegram_id(update.effective_user.id)
     if not db_user:
@@ -43,7 +43,7 @@ async def espacio_handler(update: Update, context: ExtensionContext) -> None:
     )
 
 
-async def espacio_callback(update: Update, context: ExtensionContext) -> None:
+async def espacio_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle household selection callback — switch active household."""
     query = update.callback_query
     await query.answer()

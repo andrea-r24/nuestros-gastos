@@ -19,8 +19,9 @@ Flow:
 """
 
 import logging
+from typing import List, Dict
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ExtensionContext, ConversationHandler
+from telegram.ext import ContextTypes, ConversationHandler
 from utils.supabase_client import (
     get_user_by_telegram_id,
     get_active_household,
@@ -39,7 +40,7 @@ DONE = ConversationHandler.END
 # ---------------------------------------------------------------------------
 # Step 1 — entry point
 # ---------------------------------------------------------------------------
-async def gasto_handler(update: Update, context: ExtensionContext) -> int:
+async def gasto_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Parse /gasto arguments, validate, store pending expense, show picker."""
     args = context.args or []
 
@@ -118,7 +119,7 @@ async def gasto_handler(update: Update, context: ExtensionContext) -> int:
 # ---------------------------------------------------------------------------
 # Step 2 — InlineKeyboard callback
 # ---------------------------------------------------------------------------
-async def gasto_shared_step(update: Update, context: ExtensionContext) -> int:
+async def gasto_shared_step(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle tap on a member toggle button or the Confirm button."""
     query = update.callback_query
     await query.answer()
@@ -182,7 +183,7 @@ async def gasto_shared_step(update: Update, context: ExtensionContext) -> int:
 # ---------------------------------------------------------------------------
 # Fallback — /cancelar
 # ---------------------------------------------------------------------------
-async def cancel_handler(update: Update, context: ExtensionContext) -> int:
+async def cancel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Abort the /gasto conversation."""
     context.user_data.pop("pending_expense", None)
     context.user_data.pop("pending_shared", None)
@@ -211,5 +212,3 @@ def _build_member_keyboard(others: List[Dict], selected: set) -> InlineKeyboardM
     return InlineKeyboardMarkup(buttons)
 
 
-# Need List and Dict in type hints
-from typing import List, Dict  # noqa: E402 (imported at bottom to avoid circular; harmless)

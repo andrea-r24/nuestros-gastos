@@ -13,7 +13,7 @@ sets localStorage.telegram_id, and redirects to the dashboard.
 import os
 import logging
 from telegram import Update
-from telegram.ext import ExtensionContext
+from telegram.ext import ContextTypes
 from utils.supabase_client import ensure_user_exists, create_auth_token
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ LOGIN_TEXT = (
 )
 
 
-async def login_handler(update: Update, context: ExtensionContext) -> None:
+async def login_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Generate a magic-link and send it to the user."""
     tg_user = update.effective_user
     telegram_id = tg_user.id

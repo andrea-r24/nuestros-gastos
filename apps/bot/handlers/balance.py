@@ -11,7 +11,7 @@ Algorithm:
 import logging
 from datetime import datetime
 from telegram import Update
-from telegram.ext import ExtensionContext
+from telegram.ext import ContextTypes
 from utils.supabase_client import (
     get_user_by_telegram_id,
     get_active_household,
@@ -22,7 +22,7 @@ from utils.supabase_client import (
 logger = logging.getLogger(__name__)
 
 
-async def balance_handler(update: Update, context: ExtensionContext) -> None:
+async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Query monthly balance and send formatted message."""
     db_user = get_user_by_telegram_id(update.effective_user.id)
     if not db_user:

@@ -15,7 +15,7 @@ import { categoryHierarchy, type MacroCategoryKey } from "@/lib/categories";
 
 // ── FAB Context ────────────────────────────────────────────────────────────
 const FABOpenContext = createContext<() => void>(() => { });
-export const useFABOpen = () => useContext(FABOpenContext);
+const useFABOpen = () => useContext(FABOpenContext);
 
 const NAV = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true },

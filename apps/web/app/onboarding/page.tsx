@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Home, DollarSign, Users } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
+import { createClient } from "@/lib/supabase-browser";
 
 const STEPS = [
   { id: 1, label: "Tu espacio", icon: Home },
@@ -12,6 +14,7 @@ const STEPS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,27 +24,24 @@ export default function OnboardingPage() {
   // Step 2: Budget
   const [budget, setBudget] = useState("");
 
-  // Auth check
-  useEffect(() => {
-    const tid = localStorage.getItem("telegram_id");
-    if (!tid) router.push("/");
-  }, [router]);
-
   const handleFinish = async () => {
-    const telegramId = localStorage.getItem("telegram_id");
-    if (!telegramId) return;
+    if (!user) return;
 
     setSubmitting(true);
     try {
-      await fetch("/api/setup-household", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          telegram_id: parseInt(telegramId, 10),
-          household_name: spaceName.trim() || "Casa compartida",
-          monthly_budget: budget ? parseFloat(budget) : null,
-        }),
-      });
+      // Update household directly via Supabase client (RLS allows owner updates)
+      const supabase = createClient();
+
+      if (user.active_household_id) {
+        await supabase
+          .from("households")
+          .update({
+            name: spaceName.trim() || "Casa compartida",
+            monthly_budget: budget ? parseFloat(budget) : null,
+          })
+          .eq("id", user.active_household_id);
+      }
+
       router.push("/dashboard");
     } catch {
       router.push("/dashboard");
@@ -49,6 +49,14 @@ export default function OnboardingPage() {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F4F5F8] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F5F8] flex flex-col items-center justify-center px-6 py-12">
@@ -97,7 +105,7 @@ export default function OnboardingPage() {
             <div>
               <h1 className="text-2xl font-black text-gray-900 mb-1">Ponle nombre a tu espacio</h1>
               <p className="text-sm text-gray-400">
-                Asi lo vereis tu y Pamela cuando entren al dashboard.
+                Asi lo veran todos los miembros cuando entren al dashboard.
               </p>
             </div>
 
@@ -187,7 +195,7 @@ export default function OnboardingPage() {
               <h1 className="text-2xl font-black text-gray-900 mb-2">Todo listo</h1>
               <p className="text-sm text-gray-400 leading-relaxed">
                 Tu espacio <span className="font-semibold text-gray-700">{spaceName}</span> esta configurado.
-                Puedes invitar a Pamela desde la seccion Espacios.
+                Puedes invitar miembros desde la seccion Espacios.
               </p>
             </div>
 

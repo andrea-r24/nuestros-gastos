@@ -14,13 +14,14 @@ function AuthContent() {
   useEffect(() => {
     const token = searchParams.get("token");
     if (!token) {
-      setErrorMsg("Link inválido. Escribe /login en el bot para obtener uno nuevo.");
+      setErrorMsg("Link invalido. Escribe /login en el bot para obtener uno nuevo.");
       setStatus("error");
       return;
     }
 
     async function authenticate() {
       try {
+        // Validate the magic-link token
         const authRes = await fetch("/api/bot-auth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -29,11 +30,12 @@ function AuthContent() {
         const authData = await authRes.json();
 
         if (!authData.valid) {
-          setErrorMsg(authData.error ?? "Token inválido");
+          setErrorMsg(authData.error ?? "Token invalido");
           setStatus("error");
           return;
         }
 
+        // Create or get user via register-user API
         const registerRes = await fetch("/api/register-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -50,10 +52,11 @@ function AuthContent() {
           return;
         }
 
-        localStorage.setItem("telegram_id", String(registerData.user.telegram_id));
-        router.push(registerData.isNewUser ? "/onboarding" : "/dashboard");
+        // Telegram-only users need to sign in with Google first
+        // Redirect to landing with a message
+        router.push("/?message=link_google");
       } catch {
-        setErrorMsg("Error de conexión. Intenta de nuevo.");
+        setErrorMsg("Error de conexion. Intenta de nuevo.");
         setStatus("error");
       }
     }
@@ -69,7 +72,7 @@ function AuthContent() {
 
       {status === "loading" && (
         <>
-          <h1 className="text-lg font-bold text-gray-900 mb-2">Verificando acceso…</h1>
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Verificando acceso...</h1>
           <p className="text-sm text-gray-400">Un momento, estamos validando tu link.</p>
           <div className="mt-6 flex justify-center">
             <div className="w-6 h-6 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
@@ -79,7 +82,7 @@ function AuthContent() {
 
       {status === "error" && (
         <>
-          <h1 className="text-lg font-bold text-gray-900 mb-2">Link inválido</h1>
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Link invalido</h1>
           <p className="text-sm text-gray-500 mb-6">{errorMsg}</p>
           <a
             href="/"

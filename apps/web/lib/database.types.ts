@@ -1,4 +1,4 @@
-// Types generados manualmente basados en supabase/migrations/001_initial_schema.sql
+// Types generados manualmente basados en supabase/migrations/001-004
 // Equivalente a: npx supabase gen types --project-id <id> (requiere SUPABASE_ACCESS_TOKEN)
 
 export type Json =
@@ -15,14 +15,16 @@ export interface Database {
       users: {
         Row: {
           id: number;
-          telegram_id: number;
+          supabase_auth_id: string | null;
+          telegram_id: number | null;
           name: string;
           active_household_id: number | null;
           created_at: string | null;
           updated_at: string | null;
         };
         Insert: {
-          telegram_id: number;
+          supabase_auth_id?: string | null | undefined;
+          telegram_id?: number | null | undefined;
           name: string;
           active_household_id?: number | null | undefined;
           created_at?: string | null | undefined;
@@ -252,13 +254,63 @@ export interface Database {
           },
         ];
       };
+
+      auth_tokens: {
+        Row: {
+          token: string;
+          telegram_id: number;
+          name: string;
+          expires_at: string;
+          used: boolean;
+          created_at: string;
+        };
+        Insert: {
+          token?: string | undefined;
+          telegram_id: number;
+          name: string;
+          expires_at?: string | undefined;
+          used?: boolean | undefined;
+          created_at?: string | undefined;
+        };
+        Update: Partial<Database["public"]["Tables"]["auth_tokens"]["Insert"]>;
+        Relationships: [];
+      };
+
+      link_codes: {
+        Row: {
+          code: string;
+          telegram_id: number;
+          name: string;
+          expires_at: string;
+          used: boolean;
+          created_at: string;
+        };
+        Insert: {
+          code: string;
+          telegram_id: number;
+          name: string;
+          expires_at?: string | undefined;
+          used?: boolean | undefined;
+          created_at?: string | undefined;
+        };
+        Update: Partial<Database["public"]["Tables"]["link_codes"]["Insert"]>;
+        Relationships: [];
+      };
     };
 
     Views: {};
 
     Functions: {
+      get_current_user_id: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
       set_telegram_context: {
         Args: { telegram_id: number };
+        Returns: undefined;
+      };
+      merge_users: {
+        Args: { old_user_id: number; new_user_id: number };
         Returns: undefined;
       };
     };

@@ -124,6 +124,24 @@ def create_auth_token(telegram_id: int, name: str) -> str:
     return resp.data[0]["token"]
 
 
+def create_link_code(telegram_id: int, name: str) -> str:
+    """Generate a 6-character code for linking Telegram to a web account.
+
+    The code is stored in the link_codes table and expires after 10 minutes
+    (default set by the DB column default).
+    """
+    import random
+    import string
+
+    code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    get_client().table("link_codes").insert({
+        "code": code,
+        "telegram_id": telegram_id,
+        "name": name,
+    }).execute()
+    return code
+
+
 def get_household_members(household_id: int) -> List[Dict]:
     """Return all active users who are members of the given household."""
     members = (

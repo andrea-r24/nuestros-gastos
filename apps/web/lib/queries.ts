@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "./supabase";
+import { createClient } from "./supabase-browser";
 import { categoryType } from "./utils";
 import {
   isMockMode,
@@ -7,24 +7,6 @@ import {
   MOCK_MEMBERS,
   MOCK_EXPENSES,
 } from "./mock-data";
-
-// ---------------------------------------------------------------------------
-// RLS Context Helper
-// ---------------------------------------------------------------------------
-
-/**
- * Ensures RLS context is set before executing queries.
- * Call this before any RLS-protected query to set app.telegram_id.
- */
-async function ensureRLSContext() {
-  const telegramId = localStorage.getItem("telegram_id");
-  if (!telegramId) {
-    throw new Error("Not authenticated");
-  }
-
-  const client = getSupabaseClient();
-  await client.rpc("set_telegram_context", { telegram_id: parseInt(telegramId, 10) });
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,9 +52,8 @@ export function buildMemberMap(members: Member[]): Map<number, string> {
 /** Hogar: nombre + presupuesto */
 export async function getHousehold(id: number): Promise<Household | null> {
   if (isMockMode()) return MOCK_HOUSEHOLD;
-  await ensureRLSContext();
 
-  const { data } = await getSupabaseClient()
+  const { data } = await createClient()
     .from("households")
     .select("*")
     .eq("id", id)
@@ -90,9 +71,8 @@ export async function getHouseholdMembers(
   householdId: number
 ): Promise<Member[]> {
   if (isMockMode()) return MOCK_MEMBERS;
-  await ensureRLSContext();
 
-  const { data } = await getSupabaseClient()
+  const { data } = await createClient()
     .from("household_members")
     .select("user_id, role, users!user_id(name)")
     .eq("household_id", householdId)
@@ -112,18 +92,16 @@ export async function getExpenses(
   month: number
 ): Promise<Expense[]> {
   if (isMockMode()) {
-    // Filter mock expenses by the requested year/month
     const prefix = `${year}-${String(month).padStart(2, "0")}`;
     return MOCK_EXPENSES.filter((e) => e.expense_date.startsWith(prefix));
   }
-  await ensureRLSContext();
 
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
   const end = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
 
-  const { data } = await getSupabaseClient()
+  const { data } = await createClient()
     .from("expenses")
     .select("*, users!paid_by(name)")
     .eq("household_id", householdId)
@@ -162,13 +140,12 @@ export async function insertExpense({
   sharedWith: number[];
 }) {
   if (isMockMode()) {
-    // In demo mode, add to mock expenses in memory (won't persist on refresh)
     const payer = MOCK_MEMBERS.find((m) => m.user_id === paidBy);
     const today = new Date().toISOString().split("T")[0];
     MOCK_EXPENSES.unshift({
       id: Date.now(),
       paid_by: paidBy,
-      payer_name: payer?.name ?? "Tú",
+      payer_name: payer?.name ?? "Tu",
       amount,
       category,
       type: "variable" as const,
@@ -179,9 +156,8 @@ export async function insertExpense({
     });
     return;
   }
-  await ensureRLSContext();
 
-  const { error } = await getSupabaseClient()
+  const { error } = await createClient()
     .from("expenses")
     .insert({
       household_id: householdId,
@@ -198,9 +174,8 @@ export async function insertExpense({
 /** Actualiza el presupuesto mensual del hogar */
 export async function updateBudget(householdId: number, budget: number | null) {
   if (isMockMode()) { MOCK_HOUSEHOLD.monthly_budget = budget; return; }
-  await ensureRLSContext();
 
-  const { error } = await getSupabaseClient()
+  const { error } = await createClient()
     .from("households")
     .update({ monthly_budget: budget })
     .eq("id", householdId);
@@ -210,9 +185,8 @@ export async function updateBudget(householdId: number, budget: number | null) {
 /** Actualiza el nombre del hogar */
 export async function updateHouseholdName(householdId: number, name: string) {
   if (isMockMode()) { MOCK_HOUSEHOLD.name = name; return; }
-  await ensureRLSContext();
 
-  const { error } = await getSupabaseClient()
+  const { error } = await createClient()
     .from("households")
     .update({ name })
     .eq("id", householdId);
@@ -223,7 +197,7 @@ export async function updateHouseholdName(householdId: number, name: string) {
 export async function getUserByTelegramId(
   telegramId: number
 ): Promise<{ id: number; name: string } | null> {
-  const { data } = await getSupabaseClient()
+  const { data } = await createClient()
     .from("users")
     .select("id, name")
     .eq("telegram_id", telegramId)
@@ -238,8 +212,7 @@ export async function createHousehold(userId: number, name: string, budget: numb
     MOCK_HOUSEHOLDS.push(newHousehold);
     return newHousehold;
   }
-  await ensureRLSContext();
-  const client = getSupabaseClient();
+  const client = createClient();
 
   const { data: hh, error: hhError } = await client
     .from("households")
@@ -257,9 +230,8 @@ export async function createHousehold(userId: number, name: string, budget: numb
 /** Todos los hogares donde el usuario es miembro */
 export async function getUserHouseholds(userId: number): Promise<Household[]> {
   if (isMockMode()) return MOCK_HOUSEHOLDS;
-  await ensureRLSContext();
 
-  const { data } = await getSupabaseClient()
+  const { data } = await createClient()
     .from("household_members")
     .select("households!household_id(id, name, monthly_budget)")
     .eq("user_id", userId)
@@ -275,9 +247,8 @@ export async function getUserHouseholds(userId: number): Promise<Household[]> {
 /** Actualiza el hogar activo del usuario */
 export async function setActiveHousehold(userId: number, householdId: number) {
   if (isMockMode()) { MOCK_HOUSEHOLD.id = householdId; return; }
-  await ensureRLSContext();
 
-  const { error } = await getSupabaseClient()
+  const { error } = await createClient()
     .from("users")
     .update({ active_household_id: householdId })
     .eq("id", userId);
@@ -287,10 +258,9 @@ export async function setActiveHousehold(userId: number, householdId: number) {
 /** Agrega un miembro a un household */
 export async function addMemberToHousehold(householdId: number, userId: number) {
   if (isMockMode()) throw new Error("No disponible en modo demo");
-  await ensureRLSContext();
+  const client = createClient();
 
-  // Check if already a member
-  const { data: existing } = await getSupabaseClient()
+  const { data: existing } = await client
     .from("household_members")
     .select("id")
     .eq("household_id", householdId)
@@ -301,8 +271,7 @@ export async function addMemberToHousehold(householdId: number, userId: number) 
     throw new Error("El usuario ya es miembro de este hogar");
   }
 
-  // Add as member
-  const { error } = await getSupabaseClient()
+  const { error } = await client
     .from("household_members")
     .insert({
       household_id: householdId,
@@ -316,9 +285,8 @@ export async function addMemberToHousehold(householdId: number, userId: number) 
 /** Elimina un miembro de un household (no permite eliminar al owner) */
 export async function removeMemberFromHousehold(householdId: number, userId: number) {
   if (isMockMode()) throw new Error("No disponible en modo demo");
-  await ensureRLSContext();
 
-  const { error } = await getSupabaseClient()
+  const { error } = await createClient()
     .from("household_members")
     .delete()
     .eq("household_id", householdId)

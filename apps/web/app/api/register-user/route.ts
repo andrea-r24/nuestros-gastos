@@ -7,8 +7,11 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
 /**
  * Auto-register API route.
- * Called after Telegram auth verification.
+ * Called after bot magic-link auth validation.
  * Creates user + personal household if user doesn't exist.
+ *
+ * Note: For Google OAuth users, creation happens in /auth/callback instead.
+ * This route is kept for the bot magic-link flow.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -21,18 +24,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use service_role key to bypass RLS for user creation
     const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // Check if user already exists
+    // Check if user already exists by telegram_id
     const { data: existingUser } = await supabase
       .from("users")
-      .select("id, telegram_id, name, active_household_id")
+      .select("id, telegram_id, name, active_household_id, supabase_auth_id")
       .eq("telegram_id", telegram_id)
       .single();
 
     if (existingUser) {
-      // User exists, return their data
       return NextResponse.json({
         user: existingUser,
         isNewUser: false,
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     // User doesn't exist — create user + personal household
     const displayName = `${first_name}${last_name ? " " + last_name : ""}`;
 
-    // 1. Create personal household first
+    // 1. Create personal household
     const { data: household, error: householdError } = await supabase
       .from("households")
       .insert({
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Create user with active_household_id
+    // 2. Create user (telegram-only, no supabase_auth_id yet)
     const { data: user, error: userError } = await supabase
       .from("users")
       .insert({
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
         name: displayName,
         active_household_id: household.id,
       })
-      .select("id, telegram_id, name, active_household_id")
+      .select("id, telegram_id, name, active_household_id, supabase_auth_id")
       .single();
 
     if (userError || !user) {

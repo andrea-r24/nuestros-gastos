@@ -13,6 +13,7 @@ import type { Household, Member, Expense } from "./queries";
 // ---------------------------------------------------------------------------
 export const MOCK_USER: AuthUser = {
   id: 1,
+  supabase_auth_id: "mock-uuid-andrea",
   telegram_id: 999999,
   name: "Andrea",
   active_household_id: 1,
@@ -20,6 +21,7 @@ export const MOCK_USER: AuthUser = {
 
 export const MOCK_USER_PAMELA: AuthUser = {
   id: 2,
+  supabase_auth_id: "mock-uuid-pamela",
   telegram_id: 888888,
   name: "Pamela",
   active_household_id: 1,

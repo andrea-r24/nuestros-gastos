@@ -89,14 +89,8 @@ export function useActiveHousehold() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user) return;
-
-    if (!user.active_household_id) {
-      router.push("/onboarding");
-    }
-  }, [user, loading, router]);
+  // No longer redirect to onboarding — let the dashboard handle the empty state
+  // Users without a household will see a CTA to create or join one
 
   return {
     householdId: user?.active_household_id ?? null,

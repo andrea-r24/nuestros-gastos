@@ -62,58 +62,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}${redirectTo}`);
   }
 
-  // New user — create internal user record + personal household
+  // New user — create internal user record only (no household yet)
+  // The user will create or join a household during onboarding
   const name =
     authUser.user_metadata?.full_name ||
     authUser.user_metadata?.name ||
     authUser.email?.split("@")[0] ||
     "Usuario";
-  const firstName = name.split(" ")[0];
 
-  // 1. Create personal household
-  const { data: household, error: hhError } = await serviceClient
-    .from("households")
-    .insert({
-      name: `Casa de ${firstName}`,
-      type: "permanent",
-      monthly_budget: null,
-    })
-    .select("id")
-    .single();
-
-  if (hhError || !household) {
-    console.error("Error creating household:", hhError);
-    return NextResponse.redirect(`${origin}/?error=setup_failed`);
-  }
-
-  // 2. Create user
-  const { data: newUser, error: userError } = await serviceClient
+  const { error: userError } = await serviceClient
     .from("users")
     .insert({
       supabase_auth_id: authUser.id,
       name,
       telegram_id: null,
-      active_household_id: household.id,
-    })
-    .select("id")
-    .single();
+      active_household_id: null,
+    });
 
-  if (userError || !newUser) {
+  if (userError) {
     console.error("Error creating user:", userError);
     return NextResponse.redirect(`${origin}/?error=setup_failed`);
   }
-
-  // 3. Link household creator and add as owner
-  await serviceClient
-    .from("households")
-    .update({ created_by: newUser.id })
-    .eq("id", household.id);
-
-  await serviceClient.from("household_members").insert({
-    household_id: household.id,
-    user_id: newUser.id,
-    role: "owner",
-  });
 
   return NextResponse.redirect(`${origin}/onboarding`);
 }

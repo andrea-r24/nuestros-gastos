@@ -294,3 +294,94 @@ export async function removeMemberFromHousehold(householdId: number, userId: num
 
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// Invite helpers
+// ---------------------------------------------------------------------------
+
+export interface HouseholdInvite {
+  id: number;
+  household_id: number;
+  code: string;
+  created_by: number;
+  expires_at: string;
+  max_uses: number | null;
+  use_count: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+/** Create an invite code for a household */
+export async function createInvite(householdId: number, createdBy: number): Promise<HouseholdInvite> {
+  if (isMockMode()) throw new Error("No disponible en modo demo");
+
+  const code = generateInviteCode();
+  const client = createClient();
+
+  const { data, error } = await client
+    .from("household_invites")
+    .insert({
+      household_id: householdId,
+      code,
+      created_by: createdBy,
+    })
+    .select()
+    .single();
+
+  if (error || !data) throw error ?? new Error("No se pudo crear la invitacion");
+  return data as HouseholdInvite;
+}
+
+/** Get active invites for a household */
+export async function getHouseholdInvites(householdId: number): Promise<HouseholdInvite[]> {
+  if (isMockMode()) return [];
+
+  const { data } = await createClient()
+    .from("household_invites")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("is_active", true)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+
+  return (data ?? []) as HouseholdInvite[];
+}
+
+/** Deactivate an invite */
+export async function deactivateInvite(inviteId: number): Promise<void> {
+  if (isMockMode()) return;
+
+  const { error } = await createClient()
+    .from("household_invites")
+    .update({ is_active: false })
+    .eq("id", inviteId);
+
+  if (error) throw error;
+}
+
+/** Get household info by invite code (for public invite page) */
+export async function getHouseholdByInviteCode(code: string): Promise<{ household_id: number; household_name: string } | null> {
+  const { data } = await createClient()
+    .from("household_invites")
+    .select("household_id, households!household_id(name)")
+    .eq("code", code.toUpperCase())
+    .eq("is_active", true)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (!data) return null;
+  return {
+    household_id: data.household_id,
+    household_name: (data as any).households.name,
+  };
+}
+
+/** Generate a random 8-character invite code */
+function generateInviteCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // exclude confusing chars: I, O, 0, 1
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}

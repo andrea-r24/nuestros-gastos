@@ -2,52 +2,152 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Home, DollarSign, Users } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Home,
+  Link2,
+  DollarSign,
+  Copy,
+  Share2,
+  Users,
+} from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
-import { createClient } from "@/lib/supabase-browser";
+import { createHousehold, setActiveHousehold } from "@/lib/queries";
 
-const STEPS = [
-  { id: 1, label: "Tu espacio", icon: Home },
-  { id: 2, label: "Presupuesto", icon: DollarSign },
-  { id: 3, label: "Listo", icon: Check },
+const CURRENCIES = [
+  { code: "PEN", symbol: "S/", label: "Soles" },
+  { code: "USD", symbol: "$", label: "Dólares" },
+  { code: "EUR", symbol: "€", label: "Euros" },
 ];
+
+type Step = "choose" | "create" | "join" | "invite" | "done";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<Step>("choose");
   const [submitting, setSubmitting] = useState(false);
 
-  // Step 1: Space name
-  const [spaceName, setSpaceName] = useState("Casa compartida");
-
-  // Step 2: Budget
+  // Create space state
+  const [spaceName, setSpaceName] = useState("");
+  const [currency, setCurrency] = useState("PEN");
   const [budget, setBudget] = useState("");
 
-  const handleFinish = async () => {
-    if (!user) return;
+  // Invite state (after creating space)
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
+  // Join state
+  const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [joining, setJoining] = useState(false);
+
+  // Created household id
+  const [createdHouseholdId, setCreatedHouseholdId] = useState<number | null>(null);
+
+  const currInfo = CURRENCIES.find((c) => c.code === currency) ?? CURRENCIES[0];
+
+  const handleCreateSpace = async () => {
+    if (!user || !spaceName.trim()) return;
     setSubmitting(true);
     try {
-      // Update household directly via Supabase client (RLS allows owner updates)
-      const supabase = createClient();
+      const bud = budget === "" ? null : Number(budget);
+      const newHH = await createHousehold(user.id, spaceName.trim(), bud);
+      setCreatedHouseholdId(newHH.id);
 
-      if (user.active_household_id) {
-        await supabase
-          .from("households")
-          .update({
-            name: spaceName.trim() || "Casa compartida",
-            monthly_budget: budget ? parseFloat(budget) : null,
-          })
-          .eq("id", user.active_household_id);
+      // Save currency preference
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`currency_${newHH.id}`, currency);
       }
 
-      router.push("/dashboard");
+      // Generate invite code
+      const res = await fetch("/api/create-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ household_id: newHH.id }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setInviteCode(data.invite.code);
+        setInviteLink(data.invite.link);
+      }
+
+      setStep("invite");
     } catch {
+      // If invite generation fails, still go to dashboard
       router.push("/dashboard");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleJoin = async () => {
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    setJoinError("");
+
+    try {
+      const res = await fetch("/api/join-household", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: joinCode.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setJoinError(data.error || "Error al unirse");
+        return;
+      }
+
+      router.push("/dashboard");
+    } catch {
+      setJoinError("Error de conexion. Intenta de nuevo.");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+      const input = document.createElement("input");
+      input.value = inviteLink;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Unete a mi espacio en NuestrosGastos",
+          text: `Usa este codigo para unirte: ${inviteCode}`,
+          url: inviteLink,
+        });
+      } catch {
+        handleCopyLink();
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  const handleFinishOnboarding = () => {
+    router.push("/dashboard");
   };
 
   if (loading) {
@@ -56,6 +156,12 @@ export default function OnboardingPage() {
         <div className="w-6 h-6 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // If user already has a household, skip onboarding
+  if (user?.active_household_id) {
+    router.push("/dashboard");
+    return null;
   }
 
   return (
@@ -70,45 +176,68 @@ export default function OnboardingPage() {
         </span>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-8">
-        {STEPS.map((s, i) => {
-          const done = step > s.id;
-          const active = step === s.id;
-          const Icon = s.icon;
-          return (
-            <div key={s.id} className="flex items-center gap-2">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${done
-                    ? "bg-[#22C55E] text-white"
-                    : active
-                      ? "bg-white text-[#22C55E] border-2 border-[#22C55E]"
-                      : "bg-white text-gray-300 border-2 border-gray-200"
-                  }`}
-              >
-                {done ? <Check size={14} /> : <Icon size={14} />}
-              </div>
-              {i < STEPS.length - 1 && (
-                <div className={`w-8 h-0.5 ${done ? "bg-[#22C55E]" : "bg-gray-200"}`} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
       {/* Card */}
       <div className="w-full max-w-md bg-white rounded-[28px] shadow-sm p-8">
 
-        {/* Step 1: Space name */}
-        {step === 1 && (
+        {/* Step: Choose */}
+        {step === "choose" && (
           <div className="flex flex-col gap-6">
-            <div>
-              <h1 className="text-2xl font-black text-gray-900 mb-1">Ponle nombre a tu espacio</h1>
+            <div className="text-center">
+              <h1 className="text-2xl font-black text-gray-900 mb-1">
+                Hola, {user?.name?.split(" ")[0] || "Usuario"}!
+              </h1>
               <p className="text-sm text-gray-400">
-                Asi lo veran todos los miembros cuando entren al dashboard.
+                Para empezar, crea un nuevo espacio o unete a uno existente.
               </p>
             </div>
 
+            <button
+              onClick={() => setStep("create")}
+              className="w-full flex items-center gap-4 p-5 bg-[#F4F5F8] rounded-2xl hover:bg-[#EAECF0] transition-colors text-left group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#22C55E]/10 flex items-center justify-center flex-shrink-0">
+                <Home size={22} className="text-[#22C55E]" />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold text-gray-900">Crear un espacio nuevo</p>
+                <p className="text-xs text-gray-400">Para tu hogar, departamento o viaje</p>
+              </div>
+              <ArrowRight size={18} className="text-gray-300 group-hover:text-[#22C55E] transition-colors" />
+            </button>
+
+            <button
+              onClick={() => setStep("join")}
+              className="w-full flex items-center gap-4 p-5 bg-[#F4F5F8] rounded-2xl hover:bg-[#EAECF0] transition-colors text-left group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#EC4899]/10 flex items-center justify-center flex-shrink-0">
+                <Link2 size={22} className="text-[#EC4899]" />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold text-gray-900">Unirme a un espacio</p>
+                <p className="text-xs text-gray-400">Con un codigo o enlace de invitacion</p>
+              </div>
+              <ArrowRight size={18} className="text-gray-300 group-hover:text-[#EC4899] transition-colors" />
+            </button>
+          </div>
+        )}
+
+        {/* Step: Create */}
+        {step === "create" && (
+          <div className="flex flex-col gap-5">
+            <div>
+              <button
+                onClick={() => setStep("choose")}
+                className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-3"
+              >
+                <ArrowLeft size={14} /> Volver
+              </button>
+              <h1 className="text-2xl font-black text-gray-900 mb-1">Crea tu espacio</h1>
+              <p className="text-sm text-gray-400">
+                Configura lo basico. Puedes cambiar todo despues.
+              </p>
+            </div>
+
+            {/* Space name */}
             <div>
               <label className="text-xs text-gray-400 font-medium block mb-1.5">
                 Nombre del espacio
@@ -117,43 +246,43 @@ export default function OnboardingPage() {
                 type="text"
                 value={spaceName}
                 onChange={(e) => setSpaceName(e.target.value)}
-                placeholder="Casa compartida"
+                placeholder="Mi Depa, Casa de Andrea..."
                 maxLength={50}
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-base font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#22C55E] placeholder:font-normal placeholder:text-gray-300"
                 autoFocus
               />
-              <p className="text-xs text-gray-300 mt-1.5">
-                Ejemplos: Mi Depa, Casa de Andrea y Pamela, El Nido...
-              </p>
             </div>
 
-            <button
-              onClick={() => setStep(2)}
-              disabled={!spaceName.trim()}
-              className="w-full flex items-center justify-center gap-2 bg-[#22C55E] text-white font-black rounded-2xl py-4 text-base disabled:opacity-40 hover:bg-[#16A34A] transition-colors"
-            >
-              Siguiente <ArrowRight size={18} />
-            </button>
-          </div>
-        )}
-
-        {/* Step 2: Budget */}
-        {step === 2 && (
-          <div className="flex flex-col gap-6">
-            <div>
-              <h1 className="text-2xl font-black text-gray-900 mb-1">Presupuesto mensual</h1>
-              <p className="text-sm text-gray-400">
-                Opcional. Puedes cambiarlo en cualquier momento desde Espacios.
-              </p>
-            </div>
-
+            {/* Currency */}
             <div>
               <label className="text-xs text-gray-400 font-medium block mb-1.5">
-                Limite mensual (S/)
+                Divisa
+              </label>
+              <div className="flex gap-2">
+                {CURRENCIES.map((c) => (
+                  <button
+                    key={c.code}
+                    onClick={() => setCurrency(c.code)}
+                    className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                      currency === c.code
+                        ? "bg-[#22C55E] text-white"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    {c.symbol} {c.code}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div>
+              <label className="text-xs text-gray-400 font-medium block mb-1.5">
+                Presupuesto mensual ({currInfo.symbol}) — opcional
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">
-                  S/
+                  {currInfo.symbol}
                 </span>
                 <input
                   type="number"
@@ -162,80 +291,131 @@ export default function OnboardingPage() {
                   placeholder="Sin limite"
                   min="0"
                   className="w-full border border-gray-200 rounded-2xl px-4 py-3 pl-10 text-base font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#22C55E] placeholder:font-normal placeholder:text-gray-300"
-                  autoFocus
                 />
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setStep(1)}
-                className="flex-1 border border-gray-200 text-gray-500 font-semibold rounded-2xl py-3.5 text-sm hover:bg-gray-50 transition-colors"
-              >
-                Atras
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                className="flex-[2] flex items-center justify-center gap-2 bg-[#22C55E] text-white font-black rounded-2xl py-3.5 text-base hover:bg-[#16A34A] transition-colors"
-              >
-                {budget ? "Guardar y continuar" : "Omitir"} <ArrowRight size={18} />
-              </button>
-            </div>
+            <button
+              onClick={handleCreateSpace}
+              disabled={!spaceName.trim() || submitting}
+              className="w-full flex items-center justify-center gap-2 bg-[#22C55E] text-white font-black rounded-2xl py-4 text-base disabled:opacity-40 hover:bg-[#16A34A] transition-colors"
+            >
+              {submitting ? "Creando..." : "Crear espacio"} {!submitting && <ArrowRight size={18} />}
+            </button>
           </div>
         )}
 
-        {/* Step 3: Done */}
-        {step === 3 && (
+        {/* Step: Invite members (after creating space) */}
+        {step === "invite" && (
           <div className="flex flex-col gap-6 items-center text-center">
-            <div className="w-20 h-20 rounded-full bg-[#22C55E]/10 flex items-center justify-center">
-              <Check size={36} className="text-[#22C55E]" strokeWidth={3} />
+            <div className="w-16 h-16 rounded-full bg-[#22C55E]/10 flex items-center justify-center">
+              <Check size={28} className="text-[#22C55E]" strokeWidth={3} />
             </div>
 
             <div>
-              <h1 className="text-2xl font-black text-gray-900 mb-2">Todo listo</h1>
-              <p className="text-sm text-gray-400 leading-relaxed">
-                Tu espacio <span className="font-semibold text-gray-700">{spaceName}</span> esta configurado.
-                Puedes invitar miembros desde la seccion Espacios.
+              <h1 className="text-2xl font-black text-gray-900 mb-1">Espacio creado</h1>
+              <p className="text-sm text-gray-400">
+                Ahora invita a los miembros de <span className="font-semibold text-gray-700">{spaceName}</span>
               </p>
             </div>
 
-            <div className="w-full bg-[#F4F5F8] rounded-2xl p-4 text-left">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-[#22C55E]/10 flex items-center justify-center">
-                  <Home size={15} className="text-[#22C55E]" />
+            {inviteLink && (
+              <>
+                {/* Invite code display */}
+                <div className="w-full bg-[#F4F5F8] rounded-2xl p-4">
+                  <p className="text-xs text-gray-400 mb-2">Codigo de invitacion</p>
+                  <p className="text-2xl font-black tracking-[0.2em] text-gray-900">{inviteCode}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{spaceName}</p>
-                  {budget && (
-                    <p className="text-xs text-gray-400">Presupuesto: S/ {parseFloat(budget).toLocaleString()}/mes</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pl-11">
-                <Users size={12} className="text-gray-400" />
-                <p className="text-xs text-gray-400">Invita miembros desde Espacios</p>
-              </div>
-            </div>
+
+                {/* Copy link button */}
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-gray-200 text-gray-700 font-semibold rounded-2xl py-3.5 text-sm hover:bg-gray-50 transition-colors"
+                >
+                  <Copy size={15} />
+                  {copied ? "Enlace copiado!" : "Copiar enlace de invitacion"}
+                </button>
+
+                {/* Share button */}
+                <button
+                  onClick={handleShare}
+                  className="w-full flex items-center justify-center gap-2 bg-[#22C55E] text-white font-black rounded-2xl py-4 text-base hover:bg-[#16A34A] transition-colors"
+                >
+                  <Share2 size={18} />
+                  Compartir invitacion
+                </button>
+              </>
+            )}
 
             <button
-              onClick={handleFinish}
-              disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 bg-[#22C55E] text-white font-black rounded-2xl py-4 text-base disabled:opacity-50 hover:bg-[#16A34A] transition-colors"
+              onClick={handleFinishOnboarding}
+              className={`w-full flex items-center justify-center gap-2 font-black rounded-2xl py-4 text-base transition-colors ${
+                inviteLink
+                  ? "border-2 border-gray-200 text-gray-500 hover:bg-gray-50"
+                  : "bg-[#22C55E] text-white hover:bg-[#16A34A]"
+              }`}
             >
-              {submitting ? "Configurando..." : "Ir al dashboard"}
-              {!submitting && <ArrowRight size={18} />}
+              Ir al dashboard <ArrowRight size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Step: Join */}
+        {step === "join" && (
+          <div className="flex flex-col gap-5">
+            <div>
+              <button
+                onClick={() => setStep("choose")}
+                className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-3"
+              >
+                <ArrowLeft size={14} /> Volver
+              </button>
+              <h1 className="text-2xl font-black text-gray-900 mb-1">Unirme a un espacio</h1>
+              <p className="text-sm text-gray-400">
+                Ingresa el codigo que te compartieron.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400 font-medium block mb-1.5">
+                Codigo de invitacion
+              </label>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="Ej: ABCD1234"
+                maxLength={8}
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.15em] text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#EC4899] placeholder:font-normal placeholder:text-gray-300 placeholder:text-base placeholder:tracking-normal"
+                autoFocus
+              />
+              {joinError && (
+                <p className="text-xs text-[#EC4899] mt-2">{joinError}</p>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Si te enviaron un enlace, abrelo directamente en tu navegador y te uniras automaticamente.
+            </p>
+
+            <button
+              onClick={handleJoin}
+              disabled={!joinCode.trim() || joining}
+              className="w-full flex items-center justify-center gap-2 bg-[#EC4899] text-white font-black rounded-2xl py-4 text-base disabled:opacity-40 hover:bg-[#DB2777] transition-colors"
+            >
+              {joining ? "Uniendome..." : "Unirme"} {!joining && <ArrowRight size={18} />}
             </button>
           </div>
         )}
       </div>
 
       {/* Skip */}
-      {step < 3 && (
+      {(step === "choose" || step === "create" || step === "join") && (
         <button
           onClick={() => router.push("/dashboard")}
           className="mt-4 text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
-          Omitir configuracion por ahora
+          Omitir por ahora
         </button>
       )}
     </div>

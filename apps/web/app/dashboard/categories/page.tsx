@@ -69,6 +69,10 @@ export default function CategoriesPage() {
     const [period, setPeriod] = useState<Period>("current");
 
     useEffect(() => {
+        if (!authLoading && !householdId) {
+            setLoading(false);
+            return;
+        }
         if (!authLoading && householdId) {
             // Fetch 3 months of data
             const months = [0, 1, 2].map((offset) => {
@@ -86,6 +90,19 @@ export default function CategoriesPage() {
         return (
             <div className="flex flex-col gap-4">
                 <p className="text-center text-gray-400 text-sm py-8">Cargando...</p>
+            </div>
+        );
+    }
+
+    if (!householdId) {
+        return (
+            <div className="flex flex-col gap-4">
+                <h1 className="text-xl font-bold text-gray-900">Categorías de gasto</h1>
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                    <p className="text-lg font-bold text-gray-900 mb-2">Sin datos de categorías</p>
+                    <p className="text-sm text-gray-400 mb-4">Crea o únete a un espacio para empezar a registrar gastos.</p>
+                    <button onClick={() => { window.location.href = "/onboarding"; }} className="bg-[#22C55E] text-white font-bold rounded-2xl px-6 py-3 text-sm hover:bg-[#16A34A] transition-colors">Crear espacio</button>
+                </div>
             </div>
         );
     }

@@ -79,7 +79,7 @@ export default function OnboardingPage() {
       setStep("invite");
     } catch {
       // If invite generation fails, still go to dashboard
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +104,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch {
       setJoinError("Error de conexion. Intenta de nuevo.");
     } finally {
@@ -147,7 +147,7 @@ export default function OnboardingPage() {
   };
 
   const handleFinishOnboarding = () => {
-    router.push("/dashboard");
+    window.location.href = "/dashboard";
   };
 
   if (loading) {
@@ -160,7 +160,7 @@ export default function OnboardingPage() {
 
   // If user already has a household, skip onboarding
   if (user?.active_household_id) {
-    router.push("/dashboard");
+    window.location.href = "/dashboard";
     return null;
   }
 
@@ -412,7 +412,7 @@ export default function OnboardingPage() {
       {/* Skip */}
       {(step === "choose" || step === "create" || step === "join") && (
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => window.location.href = "/dashboard"}
           className="mt-4 text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
           Omitir por ahora

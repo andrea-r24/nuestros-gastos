@@ -217,6 +217,10 @@ export default function SpacesPage() {
   };
 
   useEffect(() => {
+    if (!authLoading && !householdId) {
+      setLoading(false);
+      return;
+    }
     if (!authLoading && householdId) {
       Promise.all([
         getHousehold(householdId),
@@ -244,6 +248,19 @@ export default function SpacesPage() {
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold text-gray-900">Espacios</h1>
         <p className="text-center text-gray-400 text-sm py-8">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (!householdId) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-bold text-gray-900">Espacios</h1>
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+          <p className="text-lg font-bold text-gray-900 mb-2">Sin espacios</p>
+          <p className="text-sm text-gray-400 mb-4">Crea o únete a un espacio para empezar a registrar gastos.</p>
+          <button onClick={() => { window.location.href = "/onboarding"; }} className="bg-[#22C55E] text-white font-bold rounded-2xl px-6 py-3 text-sm hover:bg-[#16A34A] transition-colors">Crear espacio</button>
+        </div>
       </div>
     );
   }

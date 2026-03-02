@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UserPlus, Users, Crown, User, Plus, X, Pencil, Check, DollarSign, Trash2 } from "lucide-react";
+import { UserPlus, Users, Crown, User, Plus, X, Pencil, Check, DollarSign, Trash2, Link2, Copy, Share2 } from "lucide-react";
 import {
   getHousehold,
   getHouseholdMembers,
@@ -12,8 +12,11 @@ import {
   updateHouseholdName,
   createHousehold,
   setActiveHousehold,
+  getHouseholdInvites,
+  deactivateInvite,
   Household,
   Member,
+  HouseholdInvite,
 } from "@/lib/queries";
 import { useActiveHousehold, useAuth } from "@/lib/useAuth";
 import { formatCurrency } from "@/lib/utils";
@@ -51,6 +54,11 @@ export default function SpacesPage() {
 
   // Remove member
   const [removingUserId, setRemovingUserId] = useState<number | null>(null);
+
+  // Invites
+  const [invites, setInvites] = useState<HouseholdInvite[]>([]);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [copiedInviteId, setCopiedInviteId] = useState<number | null>(null);
 
   // Create space modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -161,12 +169,61 @@ export default function SpacesPage() {
     }
   };
 
+  const handleGenerateInvite = async () => {
+    if (!householdId) return;
+    setGeneratingInvite(true);
+    try {
+      const res = await fetch("/api/create-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ household_id: householdId }),
+      });
+      if (res.ok) {
+        // Refresh invites list
+        const updated = await getHouseholdInvites(householdId);
+        setInvites(updated);
+      }
+    } catch {
+      // silenced
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const handleCopyInviteLink = async (invite: HouseholdInvite) => {
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/invite/${invite.code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      const input = document.createElement("input");
+      input.value = link;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    setCopiedInviteId(invite.id);
+    setTimeout(() => setCopiedInviteId(null), 2000);
+  };
+
+  const handleDeactivateInvite = async (inviteId: number) => {
+    try {
+      await deactivateInvite(inviteId);
+      setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+    } catch {
+      // silenced
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && householdId) {
       Promise.all([
         getHousehold(householdId),
         getHouseholdMembers(householdId),
-      ]).then(([hh, mem]) => {
+        getHouseholdInvites(householdId),
+      ]).then(([hh, mem, inv]) => {
+        setInvites(inv);
         setHousehold(hh);
         setMembers(mem);
         setNameInput(hh?.name ?? "");
@@ -384,6 +441,64 @@ export default function SpacesPage() {
           >
             {addMemberStatus}
           </p>
+        )}
+      </div>
+
+      {/* Invite links */}
+      <div className="bg-white rounded-[24px] shadow-sm p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Link2 size={16} className="text-[#EC4899]" />
+            <h2 className="text-sm font-bold text-gray-900">Invitaciones</h2>
+          </div>
+          <button
+            onClick={handleGenerateInvite}
+            disabled={generatingInvite}
+            className="flex items-center gap-1.5 bg-[#EC4899] text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#DB2777] transition-colors disabled:opacity-50"
+          >
+            <Plus size={13} />
+            {generatingInvite ? "..." : "Nuevo enlace"}
+          </button>
+        </div>
+
+        {invites.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            Genera un enlace de invitacion para que otros se unan a este espacio.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {invites.map((inv) => (
+              <li key={inv.id} className="flex items-center justify-between bg-[#F4F5F8] rounded-xl p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold tracking-wider text-gray-900">{inv.code}</p>
+                  <p className="text-xs text-gray-400">
+                    Expira: {new Date(inv.expires_at).toLocaleDateString()}
+                    {inv.use_count > 0 && ` · ${inv.use_count} uso${inv.use_count !== 1 ? "s" : ""}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleCopyInviteLink(inv)}
+                    className="w-8 h-8 bg-white rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors"
+                    title="Copiar enlace"
+                  >
+                    {copiedInviteId === inv.id ? (
+                      <Check size={13} className="text-[#22C55E]" />
+                    ) : (
+                      <Copy size={13} className="text-gray-400" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleDeactivateInvite(inv.id)}
+                    className="w-8 h-8 bg-white rounded-full flex items-center justify-center hover:bg-red-50 transition-colors"
+                    title="Desactivar"
+                  >
+                    <X size={13} className="text-gray-400" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

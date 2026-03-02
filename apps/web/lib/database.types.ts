@@ -296,6 +296,47 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["link_codes"]["Insert"]>;
         Relationships: [];
       };
+
+      household_invites: {
+        Row: {
+          id: number;
+          household_id: number;
+          code: string;
+          created_by: number;
+          expires_at: string;
+          max_uses: number | null;
+          use_count: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          household_id: number;
+          code: string;
+          created_by: number;
+          expires_at?: string | undefined;
+          max_uses?: number | null | undefined;
+          use_count?: number | undefined;
+          is_active?: boolean | undefined;
+          created_at?: string | undefined;
+        };
+        Update: Partial<Database["public"]["Tables"]["household_invites"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "household_invites_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "household_invites_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
 
     Views: {};

@@ -81,7 +81,7 @@ export default function InvitePage() {
         return;
       }
 
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch {
       setError("Error de conexion. Intenta de nuevo.");
       setJoining(false);

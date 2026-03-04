@@ -14,7 +14,6 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
-import { createHousehold, setActiveHousehold } from "@/lib/queries";
 
 const CURRENCIES = [
   { code: "PEN", symbol: "S/", label: "Soles" },
@@ -50,12 +49,31 @@ export default function OnboardingPage() {
 
   const currInfo = CURRENCIES.find((c) => c.code === currency) ?? CURRENCIES[0];
 
+  // Error state for space creation
+  const [createError, setCreateError] = useState("");
+
   const handleCreateSpace = async () => {
     if (!user || !spaceName.trim()) return;
     setSubmitting(true);
+    setCreateError("");
     try {
       const bud = budget === "" ? null : Number(budget);
-      const newHH = await createHousehold(user.id, spaceName.trim(), bud);
+
+      // Call server-side API (uses service_role — bypasses RLS)
+      const res = await fetch("/api/create-space", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: spaceName.trim(), budget: bud }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCreateError(data.error || "Error al crear el espacio");
+        return;
+      }
+
+      const newHH = data.household;
       setCreatedHouseholdId(newHH.id);
 
       // Save currency preference
@@ -64,22 +82,21 @@ export default function OnboardingPage() {
       }
 
       // Generate invite code
-      const res = await fetch("/api/create-invite", {
+      const inviteRes = await fetch("/api/create-invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ household_id: newHH.id }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setInviteCode(data.invite.code);
-        setInviteLink(data.invite.link);
+      if (inviteRes.ok) {
+        const inviteData = await inviteRes.json();
+        setInviteCode(inviteData.invite.code);
+        setInviteLink(inviteData.invite.link);
       }
 
       setStep("invite");
     } catch {
-      // If invite generation fails, still go to dashboard
-      window.location.href = "/dashboard";
+      setCreateError("Error de conexion. Intenta de nuevo.");
     } finally {
       setSubmitting(false);
     }
@@ -294,6 +311,10 @@ export default function OnboardingPage() {
                 />
               </div>
             </div>
+
+            {createError && (
+              <p className="text-xs text-[#EC4899] text-center">{createError}</p>
+            )}
 
             <button
               onClick={handleCreateSpace}

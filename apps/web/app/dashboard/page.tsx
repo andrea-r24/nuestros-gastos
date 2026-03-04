@@ -110,11 +110,62 @@ function EmptyDashboard() {
   );
 }
 
+function WelcomeDashboard({ householdName }: { householdName: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4">
+      <div className="w-full max-w-sm text-center">
+        <div className="w-20 h-20 rounded-full bg-[#22C55E]/10 flex items-center justify-center mx-auto mb-6">
+          <span className="text-4xl">🎉</span>
+        </div>
+        <h2 className="text-2xl font-black text-gray-900 mb-2">
+          Bienvenido a {householdName}
+        </h2>
+        <p className="text-sm text-gray-400 mb-8 leading-relaxed">
+          Tu espacio esta listo. Registra tu primer gasto usando el boton <span className="font-semibold text-[#22C55E]">+</span> de abajo.
+        </p>
+
+        <div className="bg-white rounded-[24px] shadow-sm p-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-10 h-10 rounded-2xl bg-[#22C55E]/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">📝</span>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Registra un gasto</p>
+                <p className="text-xs text-gray-400">Toca el boton + para agregar tu primer gasto</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-10 h-10 rounded-2xl bg-[#EC4899]/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">👥</span>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Invita a tu grupo</p>
+                <p className="text-xs text-gray-400">Comparte el espacio desde Espacios</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100/50 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg">📊</span>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Ve tu resumen</p>
+                <p className="text-xs text-gray-400">Aqui apareceran tus graficos y balances</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { householdId, user, loading: authLoading } = useActiveHousehold();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [budget, setBudget] = useState<number | null>(null);
+  const [householdName, setHouseholdName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const now = new Date();
@@ -132,6 +183,7 @@ export default function DashboardPage() {
     setExpenses(exp);
     setMembers(mem);
     setBudget(hh?.monthly_budget ?? null);
+    setHouseholdName(hh?.name ?? null);
     setLoading(false);
   };
 
@@ -154,6 +206,11 @@ export default function DashboardPage() {
   // No household — show empty state
   if (!householdId) {
     return <EmptyDashboard />;
+  }
+
+  // Household exists but no expenses yet — show welcome state
+  if (expenses.length === 0) {
+    return <WelcomeDashboard householdName={householdName ?? "tu espacio"} />;
   }
 
   return (

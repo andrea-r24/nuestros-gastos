@@ -221,8 +221,11 @@ export async function createHousehold(userId: number, name: string, budget: numb
     .single();
   if (hhError || !hh) throw hhError ?? new Error("No se pudo crear el hogar");
 
-  await client.from("household_members").insert({ household_id: hh.id, user_id: userId, role: "owner" });
-  await client.from("users").update({ active_household_id: hh.id }).eq("id", userId);
+  const { error: memberError } = await client.from("household_members").insert({ household_id: hh.id, user_id: userId, role: "owner" });
+  if (memberError) throw memberError;
+
+  const { error: updateError } = await client.from("users").update({ active_household_id: hh.id }).eq("id", userId);
+  if (updateError) throw updateError;
 
   return { id: hh.id, name: hh.name, monthly_budget: hh.monthly_budget != null ? Number(hh.monthly_budget) : null };
 }

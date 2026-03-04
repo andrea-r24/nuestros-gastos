@@ -27,21 +27,18 @@ export default function InvitePage() {
 
       setIsLoggedIn(!!user);
 
-      // Validate invite code — fetch household name via public RLS
-      const { data } = await supabase
-        .from("household_invites")
-        .select("household_id, is_active, expires_at, households!household_id(name)")
-        .eq("code", code)
-        .single();
+      // Validate invite code via server-side API (bypasses RLS on households)
+      try {
+        const res = await fetch(`/api/validate-invite?code=${encodeURIComponent(code)}`);
+        const data = await res.json();
 
-      if (!data) {
-        setError("Codigo de invitacion invalido");
-      } else if (!data.is_active) {
-        setError("Esta invitacion ya no esta activa");
-      } else if (new Date(data.expires_at) < new Date()) {
-        setError("Esta invitacion ha expirado");
-      } else {
-        setHouseholdName((data as any).households?.name ?? "Espacio");
+        if (!res.ok || data.error) {
+          setError(data.error || "Codigo de invitacion invalido");
+        } else {
+          setHouseholdName(data.household_name);
+        }
+      } catch {
+        setError("Error al validar la invitacion");
       }
 
       setLoading(false);

@@ -65,13 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El codigo expiro. Escribe /link en el bot para obtener uno nuevo" }, { status: 400 });
     }
 
-    // Mark code as used
-    await serviceClient
-      .from("link_codes")
-      .update({ used: true })
-      .eq("code", code.toUpperCase());
-
-    // Get the current user's internal record
+    // Get the current user's internal record BEFORE marking code as used
     const { data: currentUser } = await serviceClient
       .from("users")
       .select("id, telegram_id")
@@ -83,10 +77,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (currentUser.telegram_id) {
-      return NextResponse.json({ error: "Ya tienes un Telegram vinculado" }, { status: 400 });
+      // Already linked — mark code as used and return success
+      await serviceClient
+        .from("link_codes")
+        .update({ used: true })
+        .eq("code", code.toUpperCase());
+      return NextResponse.json({ success: true });
     }
 
-    // Check if the telegram_id already belongs to another user
+    // Check if the telegram_id already belongs to another user (Telegram-only account from bot)
     const { data: existingTgUser } = await serviceClient
       .from("users")
       .select("id")
@@ -95,17 +94,32 @@ export async function POST(req: NextRequest) {
 
     if (existingTgUser && existingTgUser.id !== currentUser.id) {
       // Merge the old Telegram-only user into the current Google user
-      await serviceClient.rpc("merge_users", {
+      const { error: mergeError } = await serviceClient.rpc("merge_users", {
         old_user_id: existingTgUser.id,
         new_user_id: currentUser.id,
       });
+      if (mergeError) {
+        console.error("Merge users error:", mergeError);
+        // Continue anyway — linking is more important than merge
+      }
     }
 
     // Set telegram_id on the current user
-    await serviceClient
+    const { error: updateError } = await serviceClient
       .from("users")
       .update({ telegram_id: linkCode.telegram_id })
       .eq("id", currentUser.id);
+
+    if (updateError) {
+      console.error("Update telegram_id error:", updateError);
+      return NextResponse.json({ error: "Error al vincular Telegram" }, { status: 500 });
+    }
+
+    // Mark code as used ONLY after successful linking
+    await serviceClient
+      .from("link_codes")
+      .update({ used: true })
+      .eq("code", code.toUpperCase());
 
     return NextResponse.json({ success: true });
   } catch (error) {

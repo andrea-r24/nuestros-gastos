@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, createContext, useContext } from "react";
-import { X, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect, createContext, useContext } from "react";
+import { X, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { categoryHierarchy, type MacroCategoryKey } from "@/lib/categories";
-import { Member, insertExpense } from "@/lib/queries";
+import { Member, insertExpense, getCustomSubcategories, createCustomSubcategory, type CustomSubcategory } from "@/lib/queries";
 
 // Context for opening the FAB modal from BottomNav
 const FABContext = createContext<{ open: () => void }>({ open: () => { } });
@@ -35,14 +35,42 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Custom subcategories
+  const [customSubs, setCustomSubs] = useState<CustomSubcategory[]>([]);
+  const [showAddSub, setShowAddSub] = useState(false);
+  const [newSubName, setNewSubName] = useState("");
+  const [addingSubLoading, setAddingSubLoading] = useState(false);
+
+  // Load custom subcategories
+  useEffect(() => {
+    if (householdId) {
+      getCustomSubcategories(householdId).then(setCustomSubs).catch(() => { });
+    }
+  }, [householdId]);
+
   const activeMacro = categoryHierarchy[macroKey];
-  const activeSub = activeMacro.subcategories.find((s) => s.id === subId) ?? activeMacro.subcategories[0];
-  const ActiveSubIcon = activeSub.icon;
+
+  // Merge built-in subs with custom ones for the active macro
+  const customSubsForMacro = customSubs.filter((cs) => cs.macro_category === macroKey);
+  const allSubsForMacro = [
+    ...activeMacro.subcategories.map((s) => ({ id: s.id, name: s.name, icon: s.icon, isCustom: false })),
+    ...customSubsForMacro.map((cs) => ({
+      id: `custom_${cs.id}`,
+      name: cs.name,
+      icon: activeMacro.icon, // custom subs use the macro icon
+      isCustom: true,
+    })),
+  ];
+
+  const activeSub = allSubsForMacro.find((s) => s.id === subId) ?? allSubsForMacro[0];
+  const ActiveSubIcon = activeSub?.icon ?? activeMacro.icon;
   const ActiveMacroIcon = activeMacro.icon;
 
   const handleSelectMacro = (key: MacroCategoryKey) => {
     setMacroKey(key);
     setSubId(categoryHierarchy[key].subcategories[0].id);
+    setShowAddSub(false);
+    setNewSubName("");
   };
 
   const toggleMember = (userId: number) => {
@@ -60,6 +88,8 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
     setSharedWith(members.map((m) => m.user_id));
     setError(null);
     setShowDetails(false);
+    setShowAddSub(false);
+    setNewSubName("");
   };
 
   const handleClose = () => {
@@ -70,7 +100,7 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
   const handleSubmit = async () => {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      setError("El monto debe ser un número positivo.");
+      setError("El monto debe ser un numero positivo.");
       return;
     }
     if (sharedWith.length === 0) {
@@ -81,11 +111,16 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
     setSubmitting(true);
     setError(null);
     try {
+      // For custom subcategories, use the custom name as the category
+      const categoryValue = subId.startsWith("custom_")
+        ? customSubs.find((cs) => `custom_${cs.id}` === subId)?.name ?? subId
+        : subId;
+
       await insertExpense({
         householdId,
         paidBy,
         amount: numAmount,
-        category: subId,
+        category: categoryValue,
         description,
         sharedWith,
       });
@@ -95,6 +130,32 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
       setError(e instanceof Error ? e.message : "Error al guardar el gasto.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddCustomSub = async () => {
+    if (!newSubName.trim()) return;
+    setAddingSubLoading(true);
+    try {
+      const newSub = await createCustomSubcategory(
+        householdId,
+        macroKey,
+        newSubName.trim(),
+        currentUserId
+      );
+      setCustomSubs((prev) => [...prev, newSub]);
+      setSubId(`custom_${newSub.id}`);
+      setNewSubName("");
+      setShowAddSub(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al crear subcategoria";
+      if (msg.includes("duplicate") || msg.includes("unique")) {
+        setError("Esa subcategoria ya existe.");
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setAddingSubLoading(false);
     }
   };
 
@@ -174,7 +235,7 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
 
               {/* Sub-category chips */}
               <div className="flex gap-2 flex-wrap mb-4">
-                {activeMacro.subcategories.map((sub) => {
+                {allSubsForMacro.map((sub) => {
                   const SubIcon = sub.icon;
                   const active = subId === sub.id;
                   return (
@@ -194,7 +255,49 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
                     </button>
                   );
                 })}
+
+                {/* Add custom subcategory button */}
+                <button
+                  type="button"
+                  onClick={() => setShowAddSub((v) => !v)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-2 border-dashed"
+                  style={{
+                    borderColor: showAddSub ? activeMacro.color : "#D1D5DB",
+                    color: showAddSub ? activeMacro.color : "#9CA3AF",
+                    backgroundColor: showAddSub ? activeMacro.color + "10" : "transparent",
+                  }}
+                >
+                  <Plus size={12} />
+                  Agregar
+                </button>
               </div>
+
+              {/* Add subcategory inline form */}
+              {showAddSub && (
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    placeholder="Ej: Restaurantes, Menus..."
+                    value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddCustomSub();
+                    }}
+                    autoFocus
+                    maxLength={30}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                    style={{ "--tw-ring-color": activeMacro.color } as React.CSSProperties}
+                  />
+                  <button
+                    onClick={handleAddCustomSub}
+                    disabled={addingSubLoading || !newSubName.trim()}
+                    className="px-4 py-2 text-white text-sm font-semibold rounded-xl disabled:opacity-40"
+                    style={{ backgroundColor: activeMacro.color }}
+                  >
+                    {addingSubLoading ? "..." : "Crear"}
+                  </button>
+                </div>
+              )}
 
               {/* Selected summary */}
               <div
@@ -207,7 +310,7 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
                 >
                   <ActiveSubIcon size={14} style={{ color: activeMacro.color }} />
                 </div>
-                <span className="text-sm font-medium text-gray-700 flex-1">{activeSub.name}</span>
+                <span className="text-sm font-medium text-gray-700 flex-1">{activeSub?.name ?? ""}</span>
                 <span
                   className="text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
                   style={{ backgroundColor: activeMacro.color + "25", color: activeMacro.color }}
@@ -224,21 +327,21 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
                 className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-4"
               >
                 {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                {showDetails ? "Menos detalles" : "Más detalles"}
+                {showDetails ? "Menos detalles" : "Mas detalles"}
               </button>
 
               {showDetails && (
                 <div className="space-y-3 mb-4">
                   <input
                     type="text"
-                    placeholder="Descripción (opcional)"
+                    placeholder="Descripcion (opcional)"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
 
                   <div>
-                    <p className="text-xs text-gray-400 mb-2">¿Quién pagó?</p>
+                    <p className="text-xs text-gray-400 mb-2">Quien pago?</p>
                     <div className="flex gap-2 flex-wrap">
                       {members.map((m) => (
                         <button
@@ -257,7 +360,7 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-400 mb-2">¿Cómo dividir?</p>
+                    <p className="text-xs text-gray-400 mb-2">Como dividir?</p>
                     <div className="flex gap-2 flex-wrap">
                       {members.map((m) => {
                         const active = sharedWith.includes(m.user_id);
@@ -285,7 +388,7 @@ export default function FABProvider({ members, onRefresh, currentUserId, househo
                 disabled={submitting || !amount}
                 className="w-full bg-emerald-500 text-white font-semibold rounded-2xl py-4 text-base disabled:opacity-40 hover:bg-emerald-600 transition-colors active:scale-[0.98]"
               >
-                {submitting ? "Guardando…" : "Guardar gasto"}
+                {submitting ? "Guardando..." : "Guardar gasto"}
               </button>
             </div>
           </div>

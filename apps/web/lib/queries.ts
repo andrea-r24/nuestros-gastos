@@ -379,6 +379,55 @@ export async function getHouseholdByInviteCode(code: string): Promise<{ househol
   };
 }
 
+// ---------------------------------------------------------------------------
+// Custom subcategories
+// ---------------------------------------------------------------------------
+
+export interface CustomSubcategory {
+  id: number;
+  household_id: number;
+  macro_category: string;
+  name: string;
+  created_by: number;
+}
+
+/** Get custom subcategories for a household */
+export async function getCustomSubcategories(householdId: number): Promise<CustomSubcategory[]> {
+  if (isMockMode()) return [];
+
+  const { data } = await createClient()
+    .from("custom_subcategories")
+    .select("id, household_id, macro_category, name, created_by")
+    .eq("household_id", householdId)
+    .order("name");
+
+  return (data ?? []) as CustomSubcategory[];
+}
+
+/** Create a custom subcategory */
+export async function createCustomSubcategory(
+  householdId: number,
+  macroCategory: string,
+  name: string,
+  createdBy: number
+): Promise<CustomSubcategory> {
+  if (isMockMode()) throw new Error("No disponible en modo demo");
+
+  const { data, error } = await createClient()
+    .from("custom_subcategories")
+    .insert({
+      household_id: householdId,
+      macro_category: macroCategory,
+      name: name.trim(),
+      created_by: createdBy,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as CustomSubcategory;
+}
+
 /** Generate a random 8-character invite code */
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // exclude confusing chars: I, O, 0, 1

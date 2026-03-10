@@ -93,6 +93,20 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (existingTgUser && existingTgUser.id !== currentUser.id) {
+      // Clear telegram_id from old user FIRST to avoid UNIQUE constraint violation
+      const { error: clearError } = await serviceClient
+        .from("users")
+        .update({ telegram_id: null })
+        .eq("id", existingTgUser.id);
+
+      if (clearError) {
+        console.error("Clear old telegram_id error:", clearError);
+        return NextResponse.json(
+          { error: "Error al desvincular cuenta anterior de Telegram" },
+          { status: 500 }
+        );
+      }
+
       // Merge the old Telegram-only user into the current Google user
       const { error: mergeError } = await serviceClient.rpc("merge_users", {
         old_user_id: existingTgUser.id,
@@ -100,7 +114,7 @@ export async function POST(req: NextRequest) {
       });
       if (mergeError) {
         console.error("Merge users error:", mergeError);
-        // Continue anyway — linking is more important than merge
+        // Continue anyway — telegram_id is already cleared, linking can proceed
       }
     }
 
@@ -112,7 +126,10 @@ export async function POST(req: NextRequest) {
 
     if (updateError) {
       console.error("Update telegram_id error:", updateError);
-      return NextResponse.json({ error: "Error al vincular Telegram" }, { status: 500 });
+      return NextResponse.json(
+        { error: `Error al vincular: ${updateError.message}` },
+        { status: 500 }
+      );
     }
 
     // Mark code as used ONLY after successful linking

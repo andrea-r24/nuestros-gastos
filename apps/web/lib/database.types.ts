@@ -19,6 +19,7 @@ export interface Database {
           telegram_id: number | null;
           name: string;
           active_household_id: number | null;
+          avatar_url: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -27,6 +28,7 @@ export interface Database {
           telegram_id?: number | null | undefined;
           name: string;
           active_household_id?: number | null | undefined;
+          avatar_url?: string | null | undefined;
           created_at?: string | null | undefined;
           updated_at?: string | null | undefined;
         };
@@ -295,6 +297,41 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["link_codes"]["Insert"]>;
         Relationships: [];
+      };
+
+      custom_subcategories: {
+        Row: {
+          id: number;
+          household_id: number;
+          macro_category: string;
+          name: string;
+          created_by: number;
+          created_at: string | null;
+        };
+        Insert: {
+          household_id: number;
+          macro_category: string;
+          name: string;
+          created_by: number;
+          created_at?: string | null | undefined;
+        };
+        Update: Partial<Database["public"]["Tables"]["custom_subcategories"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "custom_subcategories_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "custom_subcategories_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
 
       household_invites: {

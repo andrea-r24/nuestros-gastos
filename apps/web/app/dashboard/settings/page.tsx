@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, MessageCircle, Mail, Bell, Trash2, Link2 } from "lucide-react";
+import { LogOut, MessageCircle, Mail, Bell, Trash2, Pencil, X, Camera } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 import { createClient } from "@/lib/supabase-browser";
+import Image from "next/image";
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
 
@@ -15,6 +16,13 @@ export default function SettingsPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState(false);
+
+  // Avatar state
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -52,6 +60,65 @@ export default function SettingsPage() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Solo se permiten imagenes");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError("La imagen es muy grande (max 2MB)");
+      return;
+    }
+
+    setAvatarError(null);
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = () => setAvatarPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarUpload = async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) return;
+
+    setAvatarUploading(true);
+    setAvatarError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload-avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setAvatarError(data.error || "Error al subir imagen");
+        return;
+      }
+
+      // Reload to refresh user data
+      window.location.reload();
+    } catch {
+      setAvatarError("Error de conexion");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleCloseAvatarModal = () => {
+    setShowAvatarModal(false);
+    setAvatarPreview(null);
+    setAvatarError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const name = user?.name ?? "...";
   const firstName = name.split(" ")[0];
 
@@ -65,9 +132,28 @@ export default function SettingsPage() {
           Mi cuenta
         </h2>
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-[#22C55E] flex items-center justify-center text-white text-xl font-black">
-            {firstName[0]}
-          </div>
+          {/* Avatar with edit pencil */}
+          <button
+            onClick={() => setShowAvatarModal(true)}
+            className="relative flex-shrink-0 group"
+          >
+            {user?.avatar_url ? (
+              <Image
+                src={user.avatar_url}
+                alt={name}
+                width={56}
+                height={56}
+                className="w-14 h-14 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-[#22C55E] flex items-center justify-center text-white text-xl font-black">
+                {firstName[0]}
+              </div>
+            )}
+            <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 bg-white rounded-full shadow-md flex items-center justify-center border border-gray-100 group-hover:bg-gray-50 transition-colors">
+              <Pencil size={11} className="text-gray-500" />
+            </div>
+          </button>
           <div>
             <p className="text-base font-bold text-gray-900">{name}</p>
             {user?.telegram_id && (
@@ -227,6 +313,80 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Avatar upload modal */}
+      {showAvatarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleCloseAvatarModal} />
+
+          <div className="relative bg-white w-[90%] max-w-sm rounded-3xl p-6 shadow-xl">
+            <button
+              onClick={handleCloseAvatarModal}
+              className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+            >
+              <X size={16} className="text-gray-500" />
+            </button>
+
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Foto de perfil</h3>
+
+            {/* Preview */}
+            <div className="flex justify-center mb-5">
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt="Preview"
+                  className="w-28 h-28 rounded-full object-cover border-4 border-gray-100"
+                />
+              ) : user?.avatar_url ? (
+                <Image
+                  src={user.avatar_url}
+                  alt={name}
+                  width={112}
+                  height={112}
+                  className="w-28 h-28 rounded-full object-cover border-4 border-gray-100"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-full bg-[#22C55E] flex items-center justify-center text-white text-4xl font-black border-4 border-gray-100">
+                  {firstName[0]}
+                </div>
+              )}
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
+            {/* Select button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl py-3 text-sm transition-colors mb-3"
+            >
+              <Camera size={16} />
+              {avatarPreview ? "Cambiar imagen" : "Seleccionar imagen"}
+            </button>
+
+            {avatarError && (
+              <p className="text-xs text-red-500 text-center mb-3">{avatarError}</p>
+            )}
+
+            {/* Upload button (only shows when preview is ready) */}
+            {avatarPreview && (
+              <button
+                onClick={handleAvatarUpload}
+                disabled={avatarUploading}
+                className="w-full bg-emerald-500 text-white font-semibold rounded-xl py-3 text-sm disabled:opacity-40 hover:bg-emerald-600 transition-colors"
+              >
+                {avatarUploading ? "Subiendo..." : "Guardar foto"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

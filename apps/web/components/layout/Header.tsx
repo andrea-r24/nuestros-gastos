@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, Check } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/lib/useAuth";
 import { getUserHouseholds, setActiveHousehold } from "@/lib/queries";
 import type { Household } from "@/lib/queries";
@@ -95,11 +96,20 @@ export default function Header() {
       <div className="flex items-center gap-3">
         <Link href="/dashboard/notifications" className="relative w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center">
           <Bell size={18} className="text-gray-500" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-[#EC4899] rounded-full ring-2 ring-white" />
         </Link>
-        <div className="w-9 h-9 rounded-full bg-[#22C55E] flex items-center justify-center text-white text-sm font-bold">
-          {name[0]}
-        </div>
+        {user?.avatar_url ? (
+          <Image
+            src={user.avatar_url}
+            alt={name}
+            width={36}
+            height={36}
+            className="w-9 h-9 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-[#22C55E] flex items-center justify-center text-white text-sm font-bold">
+            {name[0]}
+          </div>
+        )}
       </div>
     </header>
   );

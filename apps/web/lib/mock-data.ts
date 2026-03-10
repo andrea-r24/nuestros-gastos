@@ -17,6 +17,7 @@ export const MOCK_USER: AuthUser = {
   telegram_id: 999999,
   name: "Andrea",
   active_household_id: 1,
+  avatar_url: null,
 };
 
 export const MOCK_USER_PAMELA: AuthUser = {
@@ -25,6 +26,7 @@ export const MOCK_USER_PAMELA: AuthUser = {
   telegram_id: 888888,
   name: "Pamela",
   active_household_id: 1,
+  avatar_url: null,
 };
 
 // ---------------------------------------------------------------------------

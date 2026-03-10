@@ -11,6 +11,7 @@ export interface AuthUser {
   telegram_id: number | null;
   name: string;
   active_household_id: number | null;
+  avatar_url: string | null;
 }
 
 /**
@@ -47,7 +48,7 @@ export function useAuth() {
       // Fetch internal user record by supabase_auth_id
       const { data, error } = await supabase
         .from("users")
-        .select("id, supabase_auth_id, telegram_id, name, active_household_id")
+        .select("id, supabase_auth_id, telegram_id, name, active_household_id, avatar_url")
         .eq("supabase_auth_id", authUser.id)
         .single();
 

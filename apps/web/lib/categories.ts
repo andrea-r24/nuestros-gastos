@@ -188,16 +188,15 @@ export function getCategoryInfo(rawCategory: string): CategoryInfo {
     }
   }
 
-  // Fallback: otros / varios
+  // Fallback: show the raw name as a custom subcategory under "otros"
   const otros = categoryHierarchy.otros;
-  const varios = otros.subcategories[0];
   return {
     macroKey: "otros",
     macroName: otros.name,
     macroColor: otros.color,
     macroIcon: otros.icon,
-    subId: varios.id,
-    subName: varios.name,
-    subIcon: varios.icon,
+    subId: rawCategory,
+    subName: rawCategory,
+    subIcon: otros.icon,
   };
 }
